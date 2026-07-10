@@ -1,7 +1,7 @@
 ---
 import { createCalciferGraph } from '../scripts/graph/generateGraph'
 
-const fallbackGraph = createCalciferGraph({ nodeCount: 180, seed: 20260710 })
+const fallbackGraph = createCalciferGraph({ nodeCount: 150, seed: 20260710 })
 const toColor = (color: readonly [number, number, number]): string =>
   `rgb(${Math.round(color[0] * 255)} ${Math.round(color[1] * 255)} ${Math.round(color[2] * 255)})`
 
@@ -104,7 +104,7 @@ return {
   verified: review.isSafe,
 }`,
   `const release = await prepareRelease({
-  branch: "feat/reference-matched-fire-demon",
+  branch: "feat/face-combustion-torch-refinement",
   target: "main",
   checks: [
     "types",
@@ -121,12 +121,49 @@ const pullRequest = await openPullRequest({
 })
 
 export default pullRequest`,
+  `const route = await inspectRoute("/dashboard")
+const mobile = await renderAtViewport(route, {
+  width: 390,
+  height: 844,
+})
+
+const issue = classifyVisualFailure({
+  expected: designIntent,
+  actual: mobile,
+  consoleErrors,
+  networkErrors,
+})
+
+const fix = await implementSmallestCause(issue)
+await verifyExistingChecks(fix)`,
+  `export const evidence = {
+  changedFiles: diff.files,
+  commands: [
+    "npm test",
+    "npm run build",
+  ],
+  visual: {
+    desktop: screenshots.desktop,
+    mobile: screenshots.mobile,
+  },
+  limitations: knownLimitations,
+}
+
+assertNoFakeVerification(evidence)
+return evidence`,
 ]
 
-const codeColumns = Array.from({ length: 12 }, (_, index) => codeSources[index % codeSources.length])
+const codeColumns = Array.from({ length: 18 }, (_, index) => {
+  const first = codeSources[index % codeSources.length]
+  const second = codeSources[(index + 3) % codeSources.length]
+
+  return `${first}\n\n${second}`
+})
 ---
 
 <calcifer-graph class="graph" data-ready="false" data-dragging="false" data-failed="false">
+  <div class="code-wall-surface" aria-hidden="true"></div>
+
   <div class="code-field code-field--ambient" aria-hidden="true">
     {codeColumns.map((column) => <pre><code>{column}</code></pre>)}
   </div>
@@ -143,13 +180,17 @@ const codeColumns = Array.from({ length: 12 }, (_, index) => codeSources[index %
     aria-label="A smiling fire demon formed from connected graph nodes"
   >
     <g transform="scale(1 -1)">
-      {fallbackGraph.edges.slice(0, 2200).map((edge) => {
+      {fallbackGraph.edges.slice(0, 2800).map((edge) => {
         const source = fallbackGraph.nodes[edge.source]
         const target = fallbackGraph.nodes[edge.target]
 
         if (!source || !target) {
           return null
         }
+
+        const pupilEdge = source.role === 'pupil' || target.role === 'pupil'
+        const cavityEdge =
+          source.feature === 'mouth-cavity' || target.feature === 'mouth-cavity'
 
         return (
           <line
@@ -158,8 +199,8 @@ const codeColumns = Array.from({ length: 12 }, (_, index) => codeSources[index %
             x2={target.x}
             y2={target.y}
             stroke={toColor(source.color)}
-            stroke-opacity={source.role === 'pupil' ? '0.035' : '0.28'}
-            stroke-width="0.0042"
+            stroke-opacity={pupilEdge ? '0.045' : cavityEdge ? '0.08' : '0.29'}
+            stroke-width="0.004"
           />
         )
       })}
@@ -169,7 +210,7 @@ const codeColumns = Array.from({ length: 12 }, (_, index) => codeSources[index %
           cy={node.y}
           r={node.size / 760}
           fill={toColor(node.color)}
-          fill-opacity={node.role === 'pupil' ? '1' : '0.97'}
+          fill-opacity={node.role === 'pupil' ? '1' : node.feature === 'mouth-cavity' ? '0.78' : '0.97'}
         />
       ))}
     </g>
@@ -178,7 +219,7 @@ const codeColumns = Array.from({ length: 12 }, (_, index) => codeSources[index %
   <canvas class="canvas" aria-hidden="true"></canvas>
   <span class="sr-only">
     The graph is decorative. Drag a visible node to stretch the connected fire demon across the section
-    and reveal the code hidden in the darkness behind it.
+    and illuminate the wall of program code hidden in the darkness behind it.
   </span>
 </calcifer-graph>
 
@@ -266,6 +307,7 @@ const codeColumns = Array.from({ length: 12 }, (_, index) => codeSources[index %
     --torch-radius: 190px;
     --torch-intensity: 0;
     --torch-warmth: 0;
+    --torch-core: 0;
     position: relative;
     display: block;
     width: 100%;
@@ -281,12 +323,12 @@ const codeColumns = Array.from({ length: 12 }, (_, index) => codeSources[index %
   .graph::after {
     position: absolute;
     inset: -12%;
-    z-index: 0;
     content: '';
     pointer-events: none;
   }
 
   .graph::before {
+    z-index: 0;
     background:
       radial-gradient(circle at 68% 54%, rgba(255, 78, 12, 0.18), transparent 22%),
       radial-gradient(circle at 70% 44%, rgba(255, 188, 60, 0.075), transparent 34%),
@@ -296,26 +338,49 @@ const codeColumns = Array.from({ length: 12 }, (_, index) => codeSources[index %
   }
 
   .graph::after {
+    z-index: 2;
     background:
       radial-gradient(
-        circle var(--torch-radius) at var(--torch-x) var(--torch-y),
-        rgba(255, 190, 85, calc(var(--torch-intensity) * 0.15)),
-        rgba(255, 72, 15, calc(var(--torch-intensity) * 0.075)) 42%,
-        transparent 78%
+        circle calc(var(--torch-radius) * 0.34) at var(--torch-x) var(--torch-y),
+        rgba(255, 224, 154, calc(var(--torch-core) * 0.2)),
+        rgba(255, 133, 38, calc(var(--torch-core) * 0.12)) 48%,
+        transparent 100%
       ),
-      url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.42'/%3E%3C/svg%3E");
-    mix-blend-mode: screen, soft-light;
-    opacity: calc(0.08 + var(--torch-warmth) * 0.28);
+      radial-gradient(
+        circle var(--torch-radius) at var(--torch-x) var(--torch-y),
+        rgba(255, 174, 72, calc(var(--torch-intensity) * 0.12)),
+        rgba(255, 65, 12, calc(var(--torch-intensity) * 0.07)) 48%,
+        transparent 82%
+      );
+    mix-blend-mode: screen;
+    opacity: calc(var(--torch-warmth) * 0.86);
     transition: opacity 420ms ease;
   }
 
   .canvas,
   .fallback,
-  .code-field {
+  .code-field,
+  .code-wall-surface {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
+  }
+
+  .code-wall-surface {
+    z-index: 0;
+    background:
+      linear-gradient(90deg, rgba(255, 255, 255, 0.012), transparent 8%, transparent 92%, rgba(255, 255, 255, 0.008)),
+      repeating-linear-gradient(
+        0deg,
+        rgba(255, 255, 255, 0.007) 0,
+        rgba(255, 255, 255, 0.007) 1px,
+        transparent 1px,
+        transparent 4px
+      ),
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.38'/%3E%3C/svg%3E");
+    background-blend-mode: screen, normal, soft-light;
+    opacity: 0.075;
   }
 
   .canvas {
@@ -341,48 +406,77 @@ const codeColumns = Array.from({ length: 12 }, (_, index) => codeSources[index %
     z-index: 1;
     display: grid;
     box-sizing: border-box;
-    grid-template-columns: repeat(12, minmax(92px, 1fr));
-    gap: clamp(14px, 1.9vw, 34px);
-    padding: 1.4vh 1.1vw;
+    grid-template-columns: repeat(18, minmax(58px, 1fr));
+    gap: clamp(7px, 0.95vw, 18px);
+    padding: 0.8vh 0.6vw;
     overflow: hidden;
-    color: rgba(255, 220, 168, 0.72);
+    color: rgba(255, 224, 178, 0.76);
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
     pointer-events: none;
-    transform: rotate(-0.65deg) scale(1.035);
+    transform: rotate(-0.42deg) scale(1.025);
     transform-origin: center;
   }
 
   .code-field pre {
+    position: relative;
     min-width: 0;
     margin: 0;
     font: inherit;
-    font-size: clamp(5px, 0.37vw, 7px);
-    line-height: 1.68;
-    letter-spacing: -0.035em;
+    font-size: clamp(4.2px, 0.31vw, 6px);
+    line-height: 1.54;
+    letter-spacing: -0.045em;
     white-space: pre-wrap;
     word-break: break-word;
   }
 
+  .code-field pre:nth-child(3n + 1) {
+    transform: translateY(-2.2vh);
+  }
+
+  .code-field pre:nth-child(3n + 2) {
+    transform: translateY(1.4vh);
+  }
+
   .code-field--ambient {
-    opacity: 0.019;
-    filter: blur(0.22px);
+    opacity: 0.012;
+    filter: blur(0.18px);
   }
 
   .code-field--lit {
     z-index: 2;
     opacity: var(--torch-intensity);
+    text-shadow:
+      0 0 5px rgba(255, 194, 105, 0.52),
+      0 0 15px rgba(255, 77, 16, 0.22);
     filter:
-      drop-shadow(0 0 7px rgba(255, 142, 48, 0.38))
-      drop-shadow(0 0 20px rgba(255, 72, 14, 0.16));
+      sepia(calc(var(--torch-warmth) * 0.52))
+      saturate(calc(1 + var(--torch-warmth) * 0.9));
     mask-image: radial-gradient(
       circle var(--torch-radius) at var(--torch-x) var(--torch-y),
       #000 0,
-      rgba(0, 0, 0, 0.98) 24%,
-      rgba(0, 0, 0, 0.62) 58%,
-      rgba(0, 0, 0, 0.18) 78%,
+      rgba(0, 0, 0, 0.99) 18%,
+      rgba(0, 0, 0, 0.78) 46%,
+      rgba(0, 0, 0, 0.34) 72%,
       transparent 100%
     );
     transition: opacity 460ms ease;
+  }
+
+  .code-field--lit::before {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    content: '';
+    background: radial-gradient(
+      circle var(--torch-radius) at var(--torch-x) var(--torch-y),
+      rgba(255, 169, 70, calc(var(--torch-warmth) * 0.08)),
+      rgba(85, 24, 7, calc(var(--torch-warmth) * 0.06)) 55%,
+      transparent 100%
+    );
+  }
+
+  .graph[data-dragging='true'] .code-field--lit {
+    mix-blend-mode: screen;
   }
 
   .graph[data-ready='true'] .canvas {
@@ -405,9 +499,13 @@ const codeColumns = Array.from({ length: 12 }, (_, index) => codeSources[index %
     }
 
     .code-field {
-      grid-template-columns: repeat(8, minmax(90px, 1fr));
-      gap: 18px;
-      padding: 1.5vh 1.4vw;
+      grid-template-columns: repeat(12, minmax(62px, 1fr));
+      gap: 10px;
+      padding: 0.9vh 0.8vw;
+    }
+
+    .code-field pre {
+      font-size: clamp(4.2px, 0.52vw, 5.4px);
     }
   }
 
@@ -422,14 +520,14 @@ const codeColumns = Array.from({ length: 12 }, (_, index) => codeSources[index %
     }
 
     .code-field {
-      grid-template-columns: repeat(6, minmax(74px, 1fr));
-      gap: 12px;
-      padding: 8px;
+      grid-template-columns: repeat(8, minmax(58px, 1fr));
+      gap: 8px;
+      padding: 6px;
     }
 
     .code-field pre {
-      font-size: 5px;
-      line-height: 1.58;
+      font-size: 4px;
+      line-height: 1.5;
     }
   }
 
