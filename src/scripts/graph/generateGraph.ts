@@ -3,6 +3,7 @@ import { REFERENCE_MASK_BOUNDS, sampleReferenceDensity } from './referenceMask'
 import type {
   CalciferGraphData,
   GraphEdgeSeed,
+  GraphNodeFeature,
   GraphNodeRole,
   GraphNodeSeed,
   Rgb,
@@ -17,6 +18,23 @@ interface Point {
   x: number
   y: number
 }
+
+interface EyeDefinition {
+  centerX: number
+  centerY: number
+  radiusX: number
+  radiusY: number
+  pupilOffsetX: number
+  pupilOffsetY: number
+  wobblePhase: number
+}
+
+interface FaceGroup {
+  ids: number[]
+  anchors: number[]
+}
+
+const TAU = Math.PI * 2
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value))
@@ -41,9 +59,9 @@ const pointInsideEllipse = (
   Math.pow((x - centerX) / radiusX, 2) + Math.pow((y - centerY) / radiusY, 2) <= 1
 
 const pointInsideFaceVoid = (x: number, y: number): boolean => {
-  const leftEye = pointInsideEllipse(x, y, -0.29, -0.25, 0.235, 0.215)
-  const rightEye = pointInsideEllipse(x, y, 0.29, -0.25, 0.235, 0.215)
-  const mouth = pointInsideEllipse(x, y, 0, -0.61, 0.43, 0.255)
+  const leftEye = pointInsideEllipse(x, y, -0.305, -0.255, 0.252, 0.232)
+  const rightEye = pointInsideEllipse(x, y, 0.295, -0.248, 0.242, 0.222)
+  const mouth = pointInsideEllipse(x, y, 0, -0.64, 0.455, 0.275)
 
   return leftEye || rightEye || mouth
 }
@@ -140,10 +158,10 @@ const addNode = (
   color: Rgb,
   anchorStrength: number,
   z = 0,
+  feature?: GraphNodeFeature,
 ): number => {
   const id = nodes.length
-
-  nodes.push({
+  const node: GraphNodeSeed = {
     id,
     role,
     x: point.x,
@@ -152,8 +170,14 @@ const addNode = (
     size,
     color,
     anchorStrength,
-    phase: random() * Math.PI * 2,
-  })
+    phase: random() * TAU,
+  }
+
+  if (feature !== undefined) {
+    node.feature = feature
+  }
+
+  nodes.push(node)
 
   return id
 }
@@ -216,6 +240,37 @@ const nearestNode = (
 
     if (distance < nearestDistance) {
       nearest = node.id
+      nearestDistance = distance
+    }
+  }
+
+  return nearest
+}
+
+const nearestNodeFromIds = (
+  nodes: GraphNodeSeed[],
+  point: Point,
+  nodeIds: number[],
+  excluded = -1,
+): number => {
+  let nearest = -1
+  let nearestDistance = Number.POSITIVE_INFINITY
+
+  for (const nodeId of nodeIds) {
+    if (nodeId === excluded) {
+      continue
+    }
+
+    const node = nodes[nodeId]
+
+    if (!node) {
+      continue
+    }
+
+    const distance = Math.hypot(node.x - point.x, node.y - point.y)
+
+    if (distance < nearestDistance) {
+      nearest = nodeId
       nearestDistance = distance
     }
   }
@@ -300,150 +355,275 @@ const addEye = (
   edges: GraphEdgeSeed[],
   edgeKeys: Set<string>,
   random: () => number,
-  centerX: number,
-): { eyeIds: number[]; pupilIds: number[] } => {
-  const centerY = -0.25
-  const eyeIds: number[] = []
-  const pupilIds: number[] = []
+  definition: EyeDefinition,
+  detailScale: number,
+): FaceGroup => {
+  const ids: number[] = []
+  const anchors: number[] = []
   const outerRing: number[] = []
-  const innerRing: number[] = []
+  const middleRing: number[] = []
+  const irisRing: number[] = []
+  const pupilRing: number[] = []
+  const scleraIds: number[] = []
+  const outerCount = Math.round(mix(34, 48, detailScale))
+  const middleCount = Math.round(mix(28, 40, detailScale))
+  const irisCount = Math.round(mix(22, 30, detailScale))
+  const scleraCount = Math.round(mix(58, 116, detailScale))
+  const highlightCount = Math.round(mix(8, 14, detailScale))
+  const pupilCount = Math.round(mix(16, 22, detailScale))
+  const pupilFillCount = Math.round(mix(8, 16, detailScale))
 
-  for (let index = 0; index < 42; index += 1) {
-    const angle = (index / 42) * Math.PI * 2
-    const wobble = 1 + Math.sin(angle * 5 + centerX * 8) * 0.025
+  for (let index = 0; index < outerCount; index += 1) {
+    const angle = (index / outerCount) * TAU
+    const wobble =
+      1 +
+      Math.sin(angle * 5 + definition.wobblePhase) * 0.024 +
+      Math.sin(angle * 9 - definition.wobblePhase) * 0.012
     const point = {
-      x: centerX + Math.cos(angle) * 0.205 * wobble,
-      y: centerY + Math.sin(angle) * 0.184 * wobble,
+      x: definition.centerX + Math.cos(angle) * definition.radiusX * wobble,
+      y: definition.centerY + Math.sin(angle) * definition.radiusY * wobble,
     }
+    const hub = random() < 0.12
     const id = addNode(
       nodes,
       random,
       'eye',
       point,
-      mix(3.2, 7.6, random()),
-      mixColor([1, 0.72, 0.18], [1, 0.99, 0.9], 0.62 + random() * 0.38),
-      17,
-      0.16,
+      hub ? mix(6.2, 9.4, random()) : mix(2.2, 6.2, random()),
+      mixColor([1, 0.44, 0.055], [1, 0.98, 0.84], 0.52 + random() * 0.48),
+      19,
+      0.175,
+      'eye-outer-rim',
     )
     outerRing.push(id)
-    eyeIds.push(id)
+    ids.push(id)
   }
 
-  for (let index = 0; index < 32; index += 1) {
-    const angle = (index / 32) * Math.PI * 2
+  for (let index = 0; index < middleCount; index += 1) {
+    const angle = (index / middleCount) * TAU
+    const wobble = 1 + Math.sin(angle * 7 + definition.wobblePhase * 0.7) * 0.018
     const point = {
-      x: centerX + Math.cos(angle) * 0.132,
-      y: centerY + Math.sin(angle) * 0.119,
+      x: definition.centerX + Math.cos(angle) * definition.radiusX * 0.79 * wobble,
+      y: definition.centerY + Math.sin(angle) * definition.radiusY * 0.79 * wobble,
     }
     const id = addNode(
       nodes,
       random,
       'eye',
       point,
-      mix(2.8, 5.8, random()),
-      [1, 0.96, 0.78],
-      17.5,
-      0.17,
+      mix(1.9, 5.2, random()),
+      mixColor([1, 0.76, 0.23], [1, 1, 0.94], 0.64 + random() * 0.36),
+      19.5,
+      0.18,
+      'eye-sclera',
     )
-    innerRing.push(id)
-    eyeIds.push(id)
+    middleRing.push(id)
+    ids.push(id)
   }
 
-  connectLoop(nodes, edges, edgeKeys, outerRing, 27)
-  connectLoop(nodes, edges, edgeKeys, innerRing, 27)
+  connectLoop(nodes, edges, edgeKeys, outerRing, 30)
+  connectLoop(nodes, edges, edgeKeys, middleRing, 29)
 
   for (let index = 0; index < outerRing.length; index += 2) {
     const outer = outerRing[index]
-    const inner = innerRing[Math.floor((index / outerRing.length) * innerRing.length)]
+    const middle = middleRing[Math.floor((index / outerRing.length) * middleRing.length)]
 
-    if (outer !== undefined && inner !== undefined) {
-      addEdge(edges, edgeKeys, nodes, outer, inner, 21)
+    if (outer !== undefined && middle !== undefined) {
+      addEdge(edges, edgeKeys, nodes, outer, middle, 23)
     }
   }
 
-  for (let index = 0; index < 68; index += 1) {
-    const angle = random() * Math.PI * 2
-    const radius = Math.sqrt(random())
+  for (let index = 0; index < scleraCount; index += 1) {
+    const angle = random() * TAU
+    const minimumRadius = 0.31
+    const maximumRadius = 0.93
+    const radius = Math.sqrt(
+      minimumRadius * minimumRadius +
+        random() * (maximumRadius * maximumRadius - minimumRadius * minimumRadius),
+    )
+    const jitter = mix(0.96, 1.04, random())
     const point = {
-      x: centerX + Math.cos(angle) * 0.176 * radius,
-      y: centerY + Math.sin(angle) * 0.158 * radius,
+      x: definition.centerX + Math.cos(angle) * definition.radiusX * radius * jitter,
+      y: definition.centerY + Math.sin(angle) * definition.radiusY * radius / jitter,
     }
-    const normalized = Math.hypot((point.x - centerX) / 0.176, (point.y - centerY) / 0.158)
-
-    if (normalized < 0.31) {
-      continue
-    }
-
+    const hub = random() < 0.035
     const id = addNode(
       nodes,
       random,
       'eye',
       point,
-      mix(1.8, 4.4, random()),
-      mixColor([1, 0.67, 0.13], [1, 1, 0.92], random()),
-      17,
-      0.17,
+      hub ? mix(5.2, 7.8, random()) : mix(1.25, 4.15, Math.pow(random(), 1.3)),
+      mixColor([1, 0.76, 0.22], [1, 1, 0.96], 0.6 + random() * 0.4),
+      19.2,
+      mix(0.178, 0.195, random()),
+      'eye-sclera',
     )
-    eyeIds.push(id)
-    const target = nearestNode(nodes, point, new Set<GraphNodeRole>(['eye']), id)
-    addEdge(edges, edgeKeys, nodes, id, target, 18)
+    scleraIds.push(id)
+    ids.push(id)
   }
 
-  const pupilCenterX = centerX + (centerX < 0 ? 0.012 : -0.012)
-  const pupilCenterY = centerY - 0.004
-  const pupilRing: number[] = []
+  connectNearestNeighbours(
+    nodes,
+    edges,
+    edgeKeys,
+    [...middleRing, ...scleraIds],
+    3,
+    Math.max(definition.radiusX, definition.radiusY) * 0.43,
+    19,
+  )
 
-  for (let index = 0; index < 18; index += 1) {
-    const angle = (index / 18) * Math.PI * 2
+  for (let index = 0; index < irisCount; index += 1) {
+    const angle = (index / irisCount) * TAU
+    const wobble = 1 + Math.sin(angle * 6 - definition.wobblePhase) * 0.018
     const point = {
-      x: pupilCenterX + Math.cos(angle) * 0.058,
-      y: pupilCenterY + Math.sin(angle) * 0.055,
+      x:
+        definition.centerX +
+        definition.pupilOffsetX +
+        Math.cos(angle) * definition.radiusX * 0.34 * wobble,
+      y:
+        definition.centerY +
+        definition.pupilOffsetY +
+        Math.sin(angle) * definition.radiusY * 0.34 * wobble,
     }
-    const id = addNode(nodes, random, 'pupil', point, mix(5.8, 8.6, random()), [0.006, 0.005, 0.006], 22, 0.2)
-    pupilRing.push(id)
-    pupilIds.push(id)
+    const id = addNode(
+      nodes,
+      random,
+      'eye',
+      point,
+      mix(2.2, 5.6, random()),
+      mixColor([1, 0.69, 0.12], [1, 1, 0.9], 0.52 + random() * 0.48),
+      20.5,
+      0.205,
+      'eye-iris',
+    )
+    irisRing.push(id)
+    ids.push(id)
   }
 
-  connectLoop(nodes, edges, edgeKeys, pupilRing, 31)
+  connectLoop(nodes, edges, edgeKeys, irisRing, 31)
+
+  const pupilCenter = {
+    x: definition.centerX + definition.pupilOffsetX,
+    y: definition.centerY + definition.pupilOffsetY,
+  }
+
+  for (let index = 0; index < pupilCount; index += 1) {
+    const angle = (index / pupilCount) * TAU
+    const point = {
+      x: pupilCenter.x + Math.cos(angle) * definition.radiusX * 0.235,
+      y: pupilCenter.y + Math.sin(angle) * definition.radiusY * 0.235,
+    }
+    const id = addNode(
+      nodes,
+      random,
+      'pupil',
+      point,
+      mix(4.6, 7.8, random()),
+      [0.004, 0.004, 0.006],
+      24,
+      0.24,
+      'eye-pupil',
+    )
+    pupilRing.push(id)
+    ids.push(id)
+  }
+
+  connectLoop(nodes, edges, edgeKeys, pupilRing, 34)
 
   const pupilHub = addNode(
     nodes,
     random,
     'pupil',
-    { x: pupilCenterX, y: pupilCenterY },
-    12.5,
-    [0.003, 0.003, 0.004],
-    24,
-    0.205,
+    pupilCenter,
+    mix(11.5, 14.5, random()),
+    [0.002, 0.002, 0.004],
+    26,
+    0.245,
+    'eye-pupil',
   )
-  pupilIds.push(pupilHub)
+  ids.push(pupilHub)
 
-  for (let index = 0; index < pupilRing.length; index += 3) {
-    const pupil = pupilRing[index]
-    const eye = innerRing[Math.floor((index / pupilRing.length) * innerRing.length)]
-
-    if (pupil !== undefined) {
-      addEdge(edges, edgeKeys, nodes, pupilHub, pupil, 31)
+  for (let index = 0; index < pupilFillCount; index += 1) {
+    const angle = random() * TAU
+    const radius = Math.sqrt(random()) * 0.19
+    const point = {
+      x: pupilCenter.x + Math.cos(angle) * definition.radiusX * radius,
+      y: pupilCenter.y + Math.sin(angle) * definition.radiusY * radius,
     }
+    const id = addNode(
+      nodes,
+      random,
+      'pupil',
+      point,
+      mix(3.2, 6.4, random()),
+      [0.003, 0.003, 0.005],
+      25,
+      mix(0.235, 0.248, random()),
+      'eye-pupil',
+    )
+    ids.push(id)
+    addEdge(edges, edgeKeys, nodes, pupilHub, id, 32)
+  }
 
-    if (pupil !== undefined && eye !== undefined) {
-      addEdge(edges, edgeKeys, nodes, pupil, eye, 18)
+  for (let index = 0; index < irisRing.length; index += 2) {
+    const iris = irisRing[index]
+    const pupil = pupilRing[Math.floor((index / irisRing.length) * pupilRing.length)]
+
+    if (iris !== undefined && pupil !== undefined) {
+      addEdge(edges, edgeKeys, nodes, iris, pupil, 23)
     }
   }
 
-  for (const index of [2, 11, 21, 31]) {
-    const eye = outerRing[index]
+  const highlightCenter = {
+    x: definition.centerX - definition.radiusX * 0.36,
+    y: definition.centerY + definition.radiusY * 0.38,
+  }
+  const highlightIds: number[] = []
 
-    if (eye !== undefined) {
-      const eyeNode = nodes[eye]
-      const target = eyeNode
-        ? nearestNode(nodes, eyeNode, new Set<GraphNodeRole>(['flame', 'rim']), eye)
-        : -1
-      addEdge(edges, edgeKeys, nodes, eye, target, 12)
+  for (let index = 0; index < highlightCount; index += 1) {
+    const angle = random() * TAU
+    const radius = Math.sqrt(random())
+    const point = {
+      x: highlightCenter.x + Math.cos(angle) * definition.radiusX * 0.12 * radius,
+      y: highlightCenter.y + Math.sin(angle) * definition.radiusY * 0.1 * radius,
+    }
+    const id = addNode(
+      nodes,
+      random,
+      'eye',
+      point,
+      mix(1.6, 4.2, random()),
+      [1, 1, 0.98],
+      20,
+      0.225,
+      'eye-highlight',
+    )
+    highlightIds.push(id)
+    ids.push(id)
+  }
+
+  connectNearestNeighbours(nodes, edges, edgeKeys, highlightIds, 2, 0.075, 22)
+
+  for (const highlightId of highlightIds) {
+    const highlight = nodes[highlightId]
+
+    if (!highlight) {
+      continue
+    }
+
+    const target = nearestNodeFromIds(nodes, highlight, [...middleRing, ...scleraIds], highlightId)
+    addEdge(edges, edgeKeys, nodes, highlightId, target, 20)
+  }
+
+  for (const index of [1, Math.floor(outerCount * 0.25), Math.floor(outerCount * 0.5), Math.floor(outerCount * 0.75)]) {
+    const anchor = outerRing[index]
+
+    if (anchor !== undefined) {
+      anchors.push(anchor)
     }
   }
 
-  return { eyeIds, pupilIds }
+  return { ids, anchors }
 }
 
 const addMouth = (
@@ -451,95 +631,194 @@ const addMouth = (
   edges: GraphEdgeSeed[],
   edgeKeys: Set<string>,
   random: () => number,
-): number[] => {
-  const mouthIds: number[] = []
-  const upperLip: number[] = []
-  const lowerLip: number[] = []
+  detailScale: number,
+): FaceGroup => {
+  const ids: number[] = []
+  const anchors: number[] = []
+  const outerUpper: number[] = []
+  const outerLower: number[] = []
+  const innerUpper: number[] = []
+  const innerLower: number[] = []
+  const tongueIds: number[] = []
+  const upperCount = Math.round(mix(30, 42, detailScale))
+  const lowerCount = Math.round(mix(34, 48, detailScale))
+  const innerUpperCount = Math.round(mix(26, 36, detailScale))
+  const innerLowerCount = Math.round(mix(30, 40, detailScale))
+  const cavityCount = Math.round(mix(10, 18, detailScale))
+  const tongueCount = Math.round(mix(36, 72, detailScale))
+  const tongueCurveCount = Math.round(mix(20, 30, detailScale))
+  const highlightCount = Math.round(mix(18, 30, detailScale))
 
-  for (let index = 0; index < 34; index += 1) {
-    const progress = index / 33
-    const point = quadraticPoint(
-      { x: -0.39, y: -0.48 },
-      { x: 0, y: -0.59 },
-      { x: 0.39, y: -0.48 },
-      progress,
-    )
-    const id = addNode(
-      nodes,
-      random,
-      'mouth',
-      point,
-      mix(3.2, 6.6, random()),
-      mixColor([1, 0.22, 0.025], [0.68, 0.012, 0.02], Math.sin(progress * Math.PI) * 0.5),
-      18,
-      0.18,
-    )
-    upperLip.push(id)
-    mouthIds.push(id)
+  const addContour = (
+    target: number[],
+    count: number,
+    start: Point,
+    control: Point,
+    end: Point,
+    feature: 'mouth-outer-rim' | 'mouth-inner-rim',
+    outer: boolean,
+  ): void => {
+    for (let index = 0; index < count; index += 1) {
+      const progress = index / (count - 1)
+      const point = quadraticPoint(start, control, end, progress)
+      const corner = Math.min(progress, 1 - progress)
+      const hub = corner < 0.075 || random() < 0.045
+      const id = addNode(
+        nodes,
+        random,
+        'mouth',
+        point,
+        hub ? mix(6.2, 9.3, random()) : mix(2.1, outer ? 6.1 : 5.1, random()),
+        outer
+          ? mixColor([1, 0.43, 0.045], [0.82, 0.018, 0.032], Math.sin(progress * Math.PI) * 0.68)
+          : mixColor([1, 0.18, 0.025], [0.42, 0.004, 0.016], Math.sin(progress * Math.PI) * 0.76),
+        outer ? 20 : 21,
+        outer ? 0.205 : 0.215,
+        feature,
+      )
+      target.push(id)
+      ids.push(id)
+    }
   }
 
-  for (let index = 0; index < 38; index += 1) {
-    const progress = index / 37
-    const point = quadraticPoint(
-      { x: -0.39, y: -0.49 },
-      { x: 0, y: -0.86 },
-      { x: 0.39, y: -0.49 },
-      progress,
-    )
-    const id = addNode(
-      nodes,
-      random,
-      'mouth',
-      point,
-      mix(3, 6.2, random()),
-      mixColor([0.94, 0.045, 0.02], [0.48, 0.006, 0.018], Math.sin(progress * Math.PI)),
-      18,
-      0.18,
-    )
-    lowerLip.push(id)
-    mouthIds.push(id)
-  }
+  addContour(
+    outerUpper,
+    upperCount,
+    { x: -0.42, y: -0.505 },
+    { x: 0, y: -0.575 },
+    { x: 0.42, y: -0.505 },
+    'mouth-outer-rim',
+    true,
+  )
+  addContour(
+    outerLower,
+    lowerCount,
+    { x: -0.42, y: -0.515 },
+    { x: 0, y: -0.9 },
+    { x: 0.42, y: -0.515 },
+    'mouth-outer-rim',
+    true,
+  )
+  addContour(
+    innerUpper,
+    innerUpperCount,
+    { x: -0.355, y: -0.545 },
+    { x: 0, y: -0.605 },
+    { x: 0.355, y: -0.545 },
+    'mouth-inner-rim',
+    false,
+  )
+  addContour(
+    innerLower,
+    innerLowerCount,
+    { x: -0.355, y: -0.555 },
+    { x: 0, y: -0.825 },
+    { x: 0.355, y: -0.555 },
+    'mouth-inner-rim',
+    false,
+  )
 
-  connectChain(nodes, edges, edgeKeys, upperLip, 29)
-  connectChain(nodes, edges, edgeKeys, lowerLip, 29)
-  addEdge(edges, edgeKeys, nodes, upperLip[0] ?? -1, lowerLip[0] ?? -1, 30)
+  connectChain(nodes, edges, edgeKeys, outerUpper, 32)
+  connectChain(nodes, edges, edgeKeys, outerLower, 32)
+  connectChain(nodes, edges, edgeKeys, innerUpper, 31)
+  connectChain(nodes, edges, edgeKeys, innerLower, 31)
+  addEdge(edges, edgeKeys, nodes, outerUpper[0] ?? -1, outerLower[0] ?? -1, 34)
   addEdge(
     edges,
     edgeKeys,
     nodes,
-    upperLip[upperLip.length - 1] ?? -1,
-    lowerLip[lowerLip.length - 1] ?? -1,
-    30,
+    outerUpper[outerUpper.length - 1] ?? -1,
+    outerLower[outerLower.length - 1] ?? -1,
+    34,
+  )
+  addEdge(edges, edgeKeys, nodes, innerUpper[0] ?? -1, innerLower[0] ?? -1, 33)
+  addEdge(
+    edges,
+    edgeKeys,
+    nodes,
+    innerUpper[innerUpper.length - 1] ?? -1,
+    innerLower[innerLower.length - 1] ?? -1,
+    33,
   )
 
-  for (let index = 0; index < 86; index += 1) {
-    const angle = random() * Math.PI * 2
+  for (let index = 0; index < outerUpper.length; index += 3) {
+    const outer = outerUpper[index]
+    const inner = innerUpper[Math.floor((index / outerUpper.length) * innerUpper.length)]
+
+    if (outer !== undefined && inner !== undefined) {
+      addEdge(edges, edgeKeys, nodes, outer, inner, 24)
+    }
+  }
+
+  for (let index = 0; index < outerLower.length; index += 3) {
+    const outer = outerLower[index]
+    const inner = innerLower[Math.floor((index / outerLower.length) * innerLower.length)]
+
+    if (outer !== undefined && inner !== undefined) {
+      addEdge(edges, edgeKeys, nodes, outer, inner, 24)
+    }
+  }
+
+  for (let index = 0; index < cavityCount; index += 1) {
+    const angle = random() * TAU
     const radius = Math.sqrt(random())
     const point = {
-      x: Math.cos(angle) * 0.34 * radius,
-      y: -0.64 + Math.sin(angle) * 0.17 * radius,
+      x: Math.cos(angle) * 0.31 * radius,
+      y: -0.64 + Math.sin(angle) * 0.115 * radius,
+    }
+
+    if (point.y < -0.69) {
+      continue
+    }
+
+    const id = addNode(
+      nodes,
+      random,
+      'mouth',
+      point,
+      mix(1.2, 3.1, random()),
+      mixColor([0.018, 0.001, 0.006], [0.31, 0.006, 0.018], random() * 0.5),
+      21,
+      0.22,
+      'mouth-cavity',
+    )
+    ids.push(id)
+    const target = nearestNodeFromIds(nodes, point, [...innerUpper, ...innerLower], id)
+    addEdge(edges, edgeKeys, nodes, id, target, 15)
+  }
+
+  for (let index = 0; index < tongueCount; index += 1) {
+    const angle = random() * TAU
+    const radius = Math.sqrt(random())
+    const point = {
+      x: Math.cos(angle) * 0.275 * radius,
+      y: -0.745 + Math.sin(angle) * 0.082 * radius,
     }
     const id = addNode(
       nodes,
       random,
       'mouth',
       point,
-      mix(1.8, 4.8, random()),
-      mixColor([0.16, 0.002, 0.008], [1, 0.12, 0.025], Math.pow(random(), 1.6)),
-      18.5,
-      0.19,
+      random() < 0.045 ? mix(5.2, 7.1, random()) : mix(1.45, 4.25, random()),
+      mixColor([0.58, 0.004, 0.026], [1, 0.19, 0.035], 0.38 + random() * 0.62),
+      21,
+      mix(0.218, 0.235, random()),
+      'mouth-tongue',
     )
-    mouthIds.push(id)
-    const target = nearestNode(nodes, point, new Set<GraphNodeRole>(['mouth']), id)
-    addEdge(edges, edgeKeys, nodes, id, target, 20)
+    tongueIds.push(id)
+    ids.push(id)
   }
 
-  for (let index = 0; index < 24; index += 1) {
-    const progress = index / 23
+  connectNearestNeighbours(nodes, edges, edgeKeys, tongueIds, 3, 0.085, 20)
+
+  const tongueCurve: number[] = []
+
+  for (let index = 0; index < tongueCurveCount; index += 1) {
+    const progress = index / (tongueCurveCount - 1)
     const point = quadraticPoint(
-      { x: -0.25, y: -0.7 },
-      { x: 0, y: -0.79 },
-      { x: 0.25, y: -0.7 },
+      { x: -0.27, y: -0.69 },
+      { x: 0, y: -0.735 },
+      { x: 0.27, y: -0.69 },
       progress,
     )
     const id = addNode(
@@ -547,27 +826,91 @@ const addMouth = (
       random,
       'mouth',
       point,
-      mix(2.2, 4.5, random()),
-      mixColor([0.72, 0.015, 0.025], [1, 0.23, 0.035], 0.45 + random() * 0.55),
-      19,
-      0.2,
+      mix(2.1, 4.8, random()),
+      mixColor([0.75, 0.018, 0.035], [1, 0.35, 0.055], 0.48 + random() * 0.52),
+      21.5,
+      0.238,
+      'mouth-highlight',
     )
-    mouthIds.push(id)
+    tongueCurve.push(id)
+    ids.push(id)
   }
 
-  for (const index of [0, 9, 18, 27]) {
-    const mouth = upperLip[index]
+  connectChain(nodes, edges, edgeKeys, tongueCurve, 27)
 
-    if (mouth !== undefined) {
-      const mouthNode = nodes[mouth]
-      const target = mouthNode
-        ? nearestNode(nodes, mouthNode, new Set<GraphNodeRole>(['flame', 'rim']), mouth)
-        : -1
-      addEdge(edges, edgeKeys, nodes, mouth, target, 12)
+  for (let index = 0; index < tongueCurve.length; index += 3) {
+    const curve = tongueCurve[index]
+    const lower = innerLower[Math.floor((index / tongueCurve.length) * innerLower.length)]
+
+    if (curve !== undefined && lower !== undefined) {
+      addEdge(edges, edgeKeys, nodes, curve, lower, 21)
     }
   }
 
-  return mouthIds
+  const lipHighlights: number[] = []
+
+  for (let index = 0; index < highlightCount; index += 1) {
+    const lower = random() > 0.42
+    const progress = random()
+    const base = lower
+      ? quadraticPoint(
+          { x: -0.39, y: -0.52 },
+          { x: 0, y: -0.865 },
+          { x: 0.39, y: -0.52 },
+          progress,
+        )
+      : quadraticPoint(
+          { x: -0.39, y: -0.51 },
+          { x: 0, y: -0.58 },
+          { x: 0.39, y: -0.51 },
+          progress,
+        )
+    const point = {
+      x: base.x + mix(-0.012, 0.012, random()),
+      y: base.y + mix(-0.012, 0.012, random()),
+    }
+    const id = addNode(
+      nodes,
+      random,
+      'mouth',
+      point,
+      mix(1.35, 3.7, random()),
+      mixColor([1, 0.45, 0.055], [1, 0.92, 0.48], random() * 0.72),
+      20.5,
+      0.245,
+      'mouth-highlight',
+    )
+    lipHighlights.push(id)
+    ids.push(id)
+  }
+
+  for (const highlightId of lipHighlights) {
+    const highlight = nodes[highlightId]
+
+    if (!highlight) {
+      continue
+    }
+
+    const target = nearestNodeFromIds(
+      nodes,
+      highlight,
+      [...outerUpper, ...outerLower, ...innerUpper, ...innerLower],
+      highlightId,
+    )
+    addEdge(edges, edgeKeys, nodes, highlightId, target, 21)
+  }
+
+  for (const index of [0, Math.floor(outerUpper.length * 0.28), Math.floor(outerUpper.length * 0.72), outerUpper.length - 1]) {
+    const anchor = outerUpper[index]
+
+    if (anchor !== undefined) {
+      anchors.push(anchor)
+    }
+  }
+
+  anchors.push(outerLower[Math.floor(outerLower.length * 0.5)] ?? -1)
+
+  return { ids, anchors: anchors.filter((id) => id >= 0) }
 }
 
 export const createCalciferGraph = ({
@@ -580,7 +923,8 @@ export const createCalciferGraph = ({
   const edgeKeys = new Set<string>()
   const flameNodeIds: number[] = []
   const rimNodeIds: number[] = []
-  const desiredFlameCount = Math.max(180, Math.floor(nodeCount * 0.84))
+  const detailScale = clamp(nodeCount / 760, 0.42, 1)
+  const desiredFlameCount = Math.max(140, Math.floor(nodeCount * 0.84))
   let attempts = 0
 
   while (flameNodeIds.length < desiredFlameCount && attempts < desiredFlameCount * 180) {
@@ -617,7 +961,7 @@ export const createCalciferGraph = ({
     flameNodeIds.push(id)
   }
 
-  const desiredRimCount = Math.max(82, Math.floor(nodeCount * 0.17))
+  const desiredRimCount = Math.max(60, Math.floor(nodeCount * 0.15))
   attempts = 0
 
   while (rimNodeIds.length < desiredRimCount && attempts < desiredRimCount * 260) {
@@ -645,6 +989,7 @@ export const createCalciferGraph = ({
   }
 
   const armNodeIds: number[] = []
+  const armCloudCount = Math.round(mix(28, 50, detailScale))
 
   for (const side of [-1, 1]) {
     const mainArm: number[] = []
@@ -653,8 +998,8 @@ export const createCalciferGraph = ({
     const controlB = { x: side * 1.12, y: 0.35 }
     const end = { x: side * 1.27, y: 0.68 }
 
-    for (let index = 0; index < 24; index += 1) {
-      const progress = index / 23
+    for (let index = 0; index < 22; index += 1) {
+      const progress = index / 21
       const point = cubicPoint(start, controlA, controlB, end, progress)
       point.x += Math.sin(progress * Math.PI * 3.1) * 0.022 * side
       point.y += Math.sin(progress * Math.PI) * 0.045
@@ -674,7 +1019,7 @@ export const createCalciferGraph = ({
 
     connectChain(nodes, edges, edgeKeys, mainArm, 22)
 
-    for (let index = 0; index < 56; index += 1) {
+    for (let index = 0; index < armCloudCount; index += 1) {
       const progress = random()
       const center = cubicPoint(start, controlA, controlB, end, progress)
       const spread = mix(0.025, 0.14, Math.sin(progress * Math.PI))
@@ -693,7 +1038,7 @@ export const createCalciferGraph = ({
         mix(0.02, 0.09, random()),
       )
       armNodeIds.push(id)
-      const mainTarget = mainArm[Math.min(mainArm.length - 1, Math.round(progress * 23))]
+      const mainTarget = mainArm[Math.min(mainArm.length - 1, Math.round(progress * 21))]
 
       if (mainTarget !== undefined) {
         addEdge(edges, edgeKeys, nodes, id, mainTarget, 17)
@@ -752,12 +1097,54 @@ export const createCalciferGraph = ({
     }
   }
 
-  const leftEye = addEye(nodes, edges, edgeKeys, random, -0.29)
-  const rightEye = addEye(nodes, edges, edgeKeys, random, 0.29)
-  const mouthNodeIds = addMouth(nodes, edges, edgeKeys, random)
+  const leftEye = addEye(
+    nodes,
+    edges,
+    edgeKeys,
+    random,
+    {
+      centerX: -0.305,
+      centerY: -0.255,
+      radiusX: 0.224,
+      radiusY: 0.203,
+      pupilOffsetX: 0.014,
+      pupilOffsetY: -0.004,
+      wobblePhase: 0.35,
+    },
+    detailScale,
+  )
+  const rightEye = addEye(
+    nodes,
+    edges,
+    edgeKeys,
+    random,
+    {
+      centerX: 0.295,
+      centerY: -0.248,
+      radiusX: 0.213,
+      radiusY: 0.193,
+      pupilOffsetX: -0.014,
+      pupilOffsetY: -0.002,
+      wobblePhase: 1.2,
+    },
+    detailScale,
+  )
+  const mouth = addMouth(nodes, edges, edgeKeys, random, detailScale)
+
+  for (const faceAnchor of [...leftEye.anchors, ...rightEye.anchors, ...mouth.anchors]) {
+    const faceNode = nodes[faceAnchor]
+
+    if (!faceNode) {
+      continue
+    }
+
+    const target = nearestNode(nodes, faceNode, new Set<GraphNodeRole>(['flame', 'rim']), faceAnchor)
+    addEdge(edges, edgeKeys, nodes, faceAnchor, target, 13.5)
+  }
+
   const sparkNodeIds: number[] = []
   const emberNodeIds: number[] = []
-  const clusterCount = Math.max(20, Math.floor(nodeCount / 24))
+  const clusterCount = Math.max(14, Math.floor(nodeCount / 30))
 
   for (let clusterIndex = 0; clusterIndex < clusterCount; clusterIndex += 1) {
     const angle = mix(-0.06 * Math.PI, 1.06 * Math.PI, random())
@@ -778,11 +1165,11 @@ export const createCalciferGraph = ({
       0.11,
     )
     sparkNodeIds.push(hub)
-    const rays = Math.floor(mix(7, 15, random()))
+    const rays = Math.floor(mix(6, 13, random()))
 
     for (let rayIndex = 0; rayIndex < rays; rayIndex += 1) {
-      const rayAngle = random() * Math.PI * 2
-      const segments = random() < 0.42 ? 2 : 1
+      const rayAngle = random() * TAU
+      const segments = random() < 0.38 ? 2 : 1
       let previous = hub
 
       for (let segmentIndex = 0; segmentIndex < segments; segmentIndex += 1) {
@@ -808,7 +1195,7 @@ export const createCalciferGraph = ({
     }
   }
 
-  const emberPairCount = Math.max(34, Math.floor(nodeCount / 8))
+  const emberPairCount = Math.max(24, Math.floor(nodeCount / 10))
 
   for (let pairIndex = 0; pairIndex < emberPairCount; pairIndex += 1) {
     const angle = mix(-0.12 * Math.PI, 1.12 * Math.PI, random())
@@ -873,25 +1260,6 @@ export const createCalciferGraph = ({
 
     const target = nearestNode(nodes, node, allRoles, node.id)
     addEdge(edges, edgeKeys, nodes, node.id, target, 8)
-  }
-
-  const faceIds = [
-    ...leftEye.eyeIds,
-    ...leftEye.pupilIds,
-    ...rightEye.eyeIds,
-    ...rightEye.pupilIds,
-    ...mouthNodeIds,
-  ]
-
-  for (const faceId of faceIds) {
-    const node = nodes[faceId]
-
-    if (!node) {
-      continue
-    }
-
-    const target = nearestNode(nodes, node, new Set<GraphNodeRole>(['flame', 'rim']), faceId)
-    addEdge(edges, edgeKeys, nodes, faceId, target, 11)
   }
 
   return { nodes, edges }
