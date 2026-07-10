@@ -1,7 +1,7 @@
 ---
-import { createCalciferGraph } from '../scripts/graph/generateGraph'
+import { createPresentationGraph } from '../scripts/graph/createPresentationGraph'
 
-const fallbackGraph = createCalciferGraph({ nodeCount: 150, seed: 20260710 })
+const fallbackGraph = createPresentationGraph({ nodeCount: 150, seed: 20260710 })
 const toColor = (color: readonly [number, number, number]): string =>
   `rgb(${Math.round(color[0] * 255)} ${Math.round(color[1] * 255)} ${Math.round(color[2] * 255)})`
 
@@ -451,6 +451,14 @@ const codeColumns = Array.from({ length: 18 }, (_, index) => {
     filter:
       sepia(calc(var(--torch-warmth) * 0.52))
       saturate(calc(1 + var(--torch-warmth) * 0.9));
+    -webkit-mask-image: radial-gradient(
+      circle var(--torch-radius) at var(--torch-x) var(--torch-y),
+      #000 0,
+      rgba(0, 0, 0, 0.99) 18%,
+      rgba(0, 0, 0, 0.78) 46%,
+      rgba(0, 0, 0, 0.34) 72%,
+      transparent 100%
+    );
     mask-image: radial-gradient(
       circle var(--torch-radius) at var(--torch-x) var(--torch-y),
       #000 0,
