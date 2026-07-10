@@ -1,4 +1,5 @@
 ---
+import Hero from '../components/Hero.astro'
 import BaseLayout from '../layouts/BaseLayout.astro'
 
 const title = 'WebDev Agent Kit — safer frontend coding agents'
@@ -7,5 +8,7 @@ const description =
 ---
 
 <BaseLayout title={title} description={description}>
-  <main></main>
+  <main>
+    <Hero />
+  </main>
 </BaseLayout>
