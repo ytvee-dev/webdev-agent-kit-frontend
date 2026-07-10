@@ -58,6 +58,22 @@ const applyEdgeSpring = (
   accelerationZ[edge.target] = (accelerationZ[edge.target] ?? 0) - forceZ
 }
 
+const getRoleMotion = (role: PhysicsState['nodes'][number]['role']): number => {
+  if (role === 'spark') {
+    return 2.15
+  }
+
+  if (role === 'arm') {
+    return 1.35
+  }
+
+  if (role === 'flame') {
+    return 1
+  }
+
+  return 0.12
+}
+
 export const stepGraphPhysics = (
   state: PhysicsState,
   edges: GraphEdgeSeed[],
@@ -92,28 +108,33 @@ export const stepGraphPhysics = (
       continue
     }
 
-    const faceScale = node.role === 'flame' || node.role === 'arm' ? 1 : 0.2
-    const driftX = Math.sin(elapsedSeconds * 1.17 + node.phase) * 0.013 * faceScale * motionScale
-    const driftY = Math.cos(elapsedSeconds * 1.43 + node.phase * 1.31) * 0.015 * faceScale * motionScale
+    const roleMotion = getRoleMotion(node.role)
+    const slowWave = Math.sin(elapsedSeconds * 1.05 + node.phase)
+    const fastWave = Math.sin(elapsedSeconds * 3.6 + node.phase * 1.73)
+    const verticalWave = Math.cos(elapsedSeconds * 1.34 + node.phase * 1.21)
+    const driftX =
+      (slowWave * 0.014 + fastWave * 0.0055) * roleMotion * motionScale
+    const driftY =
+      (verticalWave * 0.017 + fastWave * 0.0045) * roleMotion * motionScale +
+      (node.role === 'spark' ? Math.sin(elapsedSeconds * 0.72 + node.phase) * 0.024 : 0)
     const influence = options.dragInfluence?.[index] ?? 0
-    const anchorScale = 1 - influence * 0.72
+    const anchorScale = 1 - influence * 0.78
     const anchor = node.anchorStrength * anchorScale
     const targetX = node.targetX + driftX
     const targetY = node.targetY + driftY
-    const targetZ = node.targetZ + Math.sin(elapsedSeconds * 0.88 + node.phase) * 0.008 * faceScale
+    const targetZ =
+      node.targetZ +
+      Math.sin(elapsedSeconds * 0.92 + node.phase) * 0.009 * roleMotion * motionScale
 
-    accelerationX[index] =
-      (accelerationX[index] ?? 0) + (targetX - node.x) * anchor
-    accelerationY[index] =
-      (accelerationY[index] ?? 0) + (targetY - node.y) * anchor
-    accelerationZ[index] =
-      (accelerationZ[index] ?? 0) + (targetZ - node.z) * anchor
+    accelerationX[index] = (accelerationX[index] ?? 0) + (targetX - node.x) * anchor
+    accelerationY[index] = (accelerationY[index] ?? 0) + (targetY - node.y) * anchor
+    accelerationZ[index] = (accelerationZ[index] ?? 0) + (targetZ - node.z) * anchor
 
     node.vx += (accelerationX[index] ?? 0) * delta
     node.vy += (accelerationY[index] ?? 0) * delta
     node.vz += (accelerationZ[index] ?? 0) * delta
 
-    const damping = Math.exp(-5.8 * delta)
+    const damping = Math.exp(-(node.role === 'spark' ? 4.65 : 5.55) * delta)
     node.vx *= damping
     node.vy *= damping
     node.vz *= damping
@@ -143,11 +164,11 @@ export const createDragInfluence = (
   while (queue.length > 0) {
     const current = queue.shift()
 
-    if (!current || current.depth > 4) {
+    if (!current || current.depth > 5) {
       continue
     }
 
-    influence[current.index] = Math.max(influence[current.index] ?? 0, Math.pow(0.58, current.depth))
+    influence[current.index] = Math.max(influence[current.index] ?? 0, Math.pow(0.62, current.depth))
 
     for (const neighbour of adjacency[current.index] ?? []) {
       if (visited.has(neighbour)) {

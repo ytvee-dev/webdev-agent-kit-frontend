@@ -6,6 +6,9 @@ const stack = ['React', 'Next.js', 'TypeScript', 'CSS Modules', 'Redux', 'TanSta
 
 <section class="hero" aria-labelledby="hero-title">
   <div class="hero__ambient" aria-hidden="true"></div>
+  <div class="hero__visual">
+    <CalciferGraph />
+  </div>
 
   <div class="hero__container">
     <div class="hero__copy">
@@ -38,53 +41,70 @@ const stack = ['React', 'Next.js', 'TypeScript', 'CSS Modules', 'Redux', 'TanSta
         {stack.map((item) => <li>{item}</li>)}
       </ul>
     </div>
-
-    <div class="hero__visual">
-      <CalciferGraph />
-    </div>
   </div>
 </section>
 
 <style>
   .hero {
+    --torch-x: 66%;
+    --torch-y: 50%;
+    --torch-radius: 220px;
+    --torch-intensity: 0;
     position: relative;
     display: grid;
     min-height: 100svh;
     overflow: clip;
     align-items: center;
-    padding: clamp(72px, 8vw, 116px) 24px;
+    padding: clamp(76px, 8vw, 118px) 24px;
+    background:
+      radial-gradient(circle at 72% 52%, rgba(70, 13, 4, 0.18), transparent 34%),
+      linear-gradient(105deg, #050505 0%, #050505 38%, #020202 100%);
   }
 
   .hero__ambient {
     position: absolute;
-    top: 5%;
-    left: 56%;
-    width: min(58vw, 820px);
-    aspect-ratio: 1;
+    inset: 0;
+    z-index: 0;
     pointer-events: none;
     background:
-      radial-gradient(circle at center, rgba(255, 92, 23, 0.13), transparent 42%),
-      radial-gradient(circle at 42% 56%, rgba(255, 193, 79, 0.065), transparent 28%);
-    filter: blur(70px);
-    transform: translateX(-10%);
+      radial-gradient(circle at 68% 50%, rgba(255, 74, 13, 0.09), transparent 24%),
+      radial-gradient(circle at 73% 45%, rgba(255, 184, 59, 0.035), transparent 36%),
+      linear-gradient(90deg, rgba(0, 0, 0, 0.38), transparent 56%);
+  }
+
+  .hero__visual {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    min-width: 0;
   }
 
   .hero__container {
     position: relative;
-    z-index: 1;
-    display: grid;
+    z-index: 3;
     width: min(1180px, 100%);
     margin: 0 auto;
-    grid-template-columns: minmax(0, 0.86fr) minmax(500px, 1.14fr);
-    gap: clamp(48px, 7vw, 92px);
-    align-items: center;
+    pointer-events: none;
   }
 
   .hero__copy {
+    position: relative;
     display: flex;
+    width: min(540px, 100%);
     min-width: 0;
     flex-direction: column;
     align-items: flex-start;
+    pointer-events: auto;
+  }
+
+  .hero__copy::before {
+    position: absolute;
+    inset: -74px -96px;
+    z-index: -1;
+    content: '';
+    pointer-events: none;
+    background: radial-gradient(ellipse at 36% 48%, rgba(3, 3, 3, 0.98) 0%, rgba(3, 3, 3, 0.86) 42%, transparent 74%);
+    filter: blur(14px);
   }
 
   .hero__eyebrow {
@@ -186,6 +206,7 @@ const stack = ['React', 'Next.js', 'TypeScript', 'CSS Modules', 'Redux', 'TanSta
 
   .hero__stack {
     display: flex;
+    max-width: 500px;
     flex-wrap: wrap;
     gap: 8px;
     padding: 0;
@@ -206,43 +227,36 @@ const stack = ['React', 'Next.js', 'TypeScript', 'CSS Modules', 'Redux', 'TanSta
     font-weight: 560;
   }
 
-  .hero__visual {
-    min-width: 0;
-  }
-
   @media (max-width: 1040px) {
     .hero {
+      min-height: 1120px;
       align-items: start;
-    }
-
-    .hero__container {
-      grid-template-columns: 1fr;
-      gap: 58px;
+      padding-top: 72px;
     }
 
     .hero__copy {
-      max-width: 720px;
+      width: min(680px, 100%);
     }
 
     h1,
     .hero__description {
-      max-width: 680px;
+      max-width: 650px;
     }
 
-    .hero__visual {
-      width: min(760px, 100%);
-      justify-self: center;
+    .hero__copy::before {
+      inset: -54px -68px;
     }
   }
 
   @media (max-width: 620px) {
     .hero {
-      min-height: auto;
-      padding: 54px 18px 34px;
+      min-height: 1120px;
+      padding: 54px 18px 500px;
     }
 
-    .hero__container {
-      gap: 42px;
+    .hero__copy::before {
+      inset: -38px -26px;
+      background: radial-gradient(ellipse at 34% 36%, rgba(3, 3, 3, 0.99) 0%, rgba(3, 3, 3, 0.9) 58%, transparent 90%);
     }
 
     .hero__eyebrow {
