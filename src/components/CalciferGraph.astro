@@ -1,0 +1,284 @@
+---
+import { createCalciferGraph } from '../scripts/graph/generateGraph'
+
+const fallbackGraph = createCalciferGraph({ nodeCount: 60, seed: 20260710 })
+const toColor = (color: readonly [number, number, number]): string =>
+  `rgb(${Math.round(color[0] * 255)} ${Math.round(color[1] * 255)} ${Math.round(color[2] * 255)})`
+
+const codeWall = `
+type AgentTask = {
+  scope: "frontend"
+  evidence: Verification[]
+  approvalRequired: boolean
+}
+
+const workflow = async (task: AgentTask) => {
+  const context = await inspectProject(task.scope)
+  const plan = createSmallestSafePlan(context)
+  const result = await executeApprovedScope(plan)
+
+  return verifyWithEvidence(result)
+}
+
+export const guardrails = {
+  broadRewrites: false,
+  unapprovedPackages: false,
+  fakeVerification: false,
+}
+`
+---
+
+<calcifer-graph class="graph" data-ready="false" data-dragging="false" data-failed="false">
+  <pre class="code-wall" aria-hidden="true"><code>{codeWall}</code></pre>
+
+  <svg
+    class="fallback"
+    viewBox="-1.45 -1.25 2.9 2.55"
+    preserveAspectRatio="xMidYMid meet"
+    role="img"
+    aria-label="A fire-shaped graph made from connected nodes"
+  >
+    <g transform="scale(1 -1)">
+      {fallbackGraph.edges.slice(0, 260).map((edge) => {
+        const source = fallbackGraph.nodes[edge.source]
+        const target = fallbackGraph.nodes[edge.target]
+
+        if (!source || !target) {
+          return null
+        }
+
+        return (
+          <line
+            x1={source.x}
+            y1={source.y}
+            x2={target.x}
+            y2={target.y}
+            stroke={toColor(source.color)}
+            stroke-opacity="0.22"
+            stroke-width="0.006"
+          />
+        )
+      })}
+      {fallbackGraph.nodes.map((node) => (
+        <circle
+          cx={node.x}
+          cy={node.y}
+          r={node.size / 650}
+          fill={toColor(node.color)}
+          fill-opacity={node.role === 'pupil' ? '1' : '0.92'}
+        />
+      ))}
+    </g>
+  </svg>
+
+  <canvas class="canvas" aria-hidden="true"></canvas>
+  <span class="sr-only">
+    The graph is decorative. Drag a visible node to pull its connected neighbours and reveal code in
+    the darkness behind it.
+  </span>
+</calcifer-graph>
+
+<script>
+  class CalciferGraphElement extends HTMLElement {
+    private cleanup?: () => void
+    private loadPromise?: Promise<void>
+    private idleId?: number
+    private timeoutId?: ReturnType<typeof globalThis.setTimeout>
+
+    connectedCallback(): void {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        this.dataset.motion = 'reduced'
+        return
+      }
+
+      const loadImmediately = (): void => {
+        void this.load()
+      }
+
+      this.addEventListener('pointerenter', loadImmediately, { once: true })
+      this.addEventListener('pointerdown', loadImmediately, { once: true })
+
+      const idleWindow = window as Window & {
+        requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number
+      }
+
+      if (typeof idleWindow.requestIdleCallback === 'function') {
+        this.idleId = idleWindow.requestIdleCallback(() => void this.load(), { timeout: 1600 })
+      } else {
+        this.timeoutId = globalThis.setTimeout(() => void this.load(), 900)
+      }
+    }
+
+    disconnectedCallback(): void {
+      this.cleanup?.()
+
+      const idleWindow = window as Window & {
+        cancelIdleCallback?: (handle: number) => void
+      }
+
+      if (this.idleId !== undefined && typeof idleWindow.cancelIdleCallback === 'function') {
+        idleWindow.cancelIdleCallback(this.idleId)
+      }
+
+      if (this.timeoutId !== undefined) {
+        window.clearTimeout(this.timeoutId)
+      }
+    }
+
+    private load(): Promise<void> {
+      if (this.loadPromise) {
+        return this.loadPromise
+      }
+
+      this.loadPromise = import('../scripts/graph/mountCalciferGraph')
+        .then(({ mountCalciferGraph }) => {
+          const canvas = this.querySelector('canvas')
+
+          if (!(canvas instanceof HTMLCanvasElement) || !canvas.getContext) {
+            this.dataset.failed = 'true'
+            return
+          }
+
+          this.cleanup = mountCalciferGraph(this, canvas)
+        })
+        .catch(() => {
+          this.dataset.failed = 'true'
+          this.dataset.ready = 'false'
+        })
+
+      return this.loadPromise
+    }
+  }
+
+  if (!customElements.get('calcifer-graph')) {
+    customElements.define('calcifer-graph', CalciferGraphElement)
+  }
+</script>
+
+<style>
+  .graph {
+    --torch-x: 50%;
+    --torch-y: 50%;
+    --torch-intensity: 0;
+    position: relative;
+    display: block;
+    width: 100%;
+    min-height: 520px;
+    overflow: hidden;
+    isolation: isolate;
+    border: 1px solid rgba(255, 203, 127, 0.14);
+    border-radius: 28px;
+    background:
+      radial-gradient(circle at 50% 54%, rgba(255, 73, 16, 0.12), transparent 25%),
+      radial-gradient(circle at 48% 48%, rgba(255, 177, 51, 0.055), transparent 45%),
+      linear-gradient(145deg, rgba(16, 14, 12, 0.98), rgba(5, 5, 5, 0.99));
+    box-shadow:
+      0 36px 90px rgba(0, 0, 0, 0.45),
+      inset 0 1px 0 rgba(255, 236, 205, 0.045);
+    contain: layout paint style;
+    touch-action: none;
+  }
+
+  .graph::before,
+  .graph::after {
+    position: absolute;
+    inset: -20%;
+    z-index: -1;
+    content: '';
+    pointer-events: none;
+  }
+
+  .graph::before {
+    opacity: 0.28;
+    background:
+      radial-gradient(circle at 28% 22%, rgba(255, 122, 37, 0.11), transparent 16%),
+      radial-gradient(circle at 72% 68%, rgba(98, 33, 13, 0.18), transparent 23%);
+    filter: blur(34px);
+  }
+
+  .graph::after {
+    opacity: 0.18;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+    mix-blend-mode: soft-light;
+  }
+
+  .canvas,
+  .fallback,
+  .code-wall {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .canvas {
+    z-index: 3;
+    display: block;
+    opacity: 0;
+    transition: opacity 500ms ease;
+  }
+
+  .fallback {
+    z-index: 2;
+    box-sizing: border-box;
+    padding: 8%;
+    filter: drop-shadow(0 0 18px rgba(255, 82, 18, 0.3));
+    opacity: 1;
+    transition: opacity 420ms ease;
+  }
+
+  .code-wall {
+    z-index: 1;
+    padding: 58px 46px;
+    margin: 0;
+    overflow: hidden;
+    color: rgba(255, 219, 159, 0.66);
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: clamp(9px, 1vw, 12px);
+    line-height: 1.85;
+    letter-spacing: -0.01em;
+    white-space: pre-wrap;
+    opacity: var(--torch-intensity);
+    filter: blur(0.15px);
+    mask-image: radial-gradient(
+      circle 172px at var(--torch-x) var(--torch-y),
+      #000 0,
+      rgba(0, 0, 0, 0.96) 25%,
+      rgba(0, 0, 0, 0.46) 58%,
+      transparent 100%
+    );
+    transition: opacity 450ms ease;
+  }
+
+  .graph[data-ready='true'] .canvas {
+    opacity: 1;
+  }
+
+  .graph[data-ready='true'] .fallback {
+    opacity: 0;
+  }
+
+  .graph[data-failed='true'] .fallback,
+  .graph[data-motion='reduced'] .fallback {
+    opacity: 1;
+  }
+
+  @media (max-width: 760px) {
+    .graph {
+      min-height: 430px;
+      border-radius: 22px;
+    }
+
+    .code-wall {
+      padding: 44px 28px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .canvas,
+    .fallback,
+    .code-wall {
+      transition: none;
+    }
+  }
+</style>
