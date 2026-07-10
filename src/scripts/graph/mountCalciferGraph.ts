@@ -223,7 +223,7 @@ export const mountCalciferGraph = (
   const resizeObserver = new ResizeObserver(() => resize())
   const positionAttribute = pointGeometry.getAttribute('position') as THREE.BufferAttribute
   const colorAttribute = pointGeometry.getAttribute('color') as THREE.BufferAttribute
-  const heatAttribute = pointGeometry.getAttribute('aHeat') as THREE.BufffWrAttribute
+  const heatAttribute = pointGeometry.getAttribute('aHeat') as THREE.BufferAttribute
   const sizeAttribute = pointGeometry.getAttribute('aSize') as THREE.BufferAttribute
   const linePositionAttribute = lineGeometry.getAttribute('position') as THREE.BufferAttribute
   const lineColorAttribute = lineGeometry.getAttribute('color') as THREE.BufferAttribute
@@ -260,6 +260,7 @@ export const mountCalciferGraph = (
     const rect = host.getBoundingClientRect()
     const x = clamp(event.clientX - rect.left, 0, rect.width)
     const y = clamp(event.clientY - rect.top, 0, rect.height)
+
     host.style.setProperty('--torch-x', `${x}px`)
     host.style.setProperty('--torch-y', `${y}px`)
     host.style.setProperty('--torch-intensity', intensity.toFixed(3))
