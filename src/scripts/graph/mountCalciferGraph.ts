@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { createCalciferGraph } from './generateGraph'
+import { createPresentationGraph } from './createPresentationGraph'
 import { createDragInfluence, createPhysicsState, stepGraphPhysics } from './physics'
 import type { CalciferGraphData, GraphNodeSeed, Rgb } from './types'
 
@@ -315,9 +315,9 @@ export const mountCalciferGraph = (
   host: HTMLElement,
   canvas: HTMLCanvasElement,
 ): (() => void) => {
-  const graph = createCalciferGraph({ nodeCount: getQualityNodeCount() })
+  const graph = createPresentationGraph({ nodeCount: getQualityNodeCount() })
   const state = createPhysicsState(graph)
-  const torchSurface = host.closest<HTMLElement>('.hero') ?? host
+  const torchSurface = host
   const renderer = new THREE.WebGLRenderer({
     canvas,
     alpha: true,
