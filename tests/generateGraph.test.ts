@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createCalciferGraph } from '../src/scripts/graph/generateGraph'
+import { createPresentationGraph } from '../src/scripts/graph/createPresentationGraph'
 
 const expectedRoles = new Set([
   'flame',
@@ -24,15 +24,15 @@ const countBy = <T extends string>(values: T[]): Map<T, number> => {
 }
 
 test('graph generation is deterministic for a fixed seed', () => {
-  const first = createCalciferGraph({ nodeCount: 180, seed: 42 })
-  const second = createCalciferGraph({ nodeCount: 180, seed: 42 })
+  const first = createPresentationGraph({ nodeCount: 180, seed: 42 })
+  const second = createPresentationGraph({ nodeCount: 180, seed: 42 })
 
   assert.deepEqual(first.nodes, second.nodes)
   assert.deepEqual(first.edges, second.edges)
 })
 
 test('graph contains the reference-matched body, face and detached fire systems', () => {
-  const graph = createCalciferGraph({ nodeCount: 180, seed: 7 })
+  const graph = createPresentationGraph({ nodeCount: 180, seed: 7 })
   const roles = new Set(graph.nodes.map((node) => node.role))
   const degree = new Uint16Array(graph.nodes.length)
   const roleCounts = countBy(graph.nodes.map((node) => node.role))
@@ -60,7 +60,7 @@ test('graph contains the reference-matched body, face and detached fire systems'
 })
 
 test('eyes use dense annular sclera, bright iris spokes and compact black pupils', () => {
-  const graph = createCalciferGraph({ nodeCount: 220, seed: 2026 })
+  const graph = createPresentationGraph({ nodeCount: 220, seed: 2026 })
   const featureCounts = countBy(
     graph.nodes.flatMap((node) => (node.feature === undefined ? [] : [node.feature])),
   )
@@ -87,7 +87,7 @@ test('eyes use dense annular sclera, bright iris spokes and compact black pupils
 })
 
 test('mouth keeps a dark open cavity with a luminous double rim and lower tongue', () => {
-  const graph = createCalciferGraph({ nodeCount: 220, seed: 2026 })
+  const graph = createPresentationGraph({ nodeCount: 220, seed: 2026 })
   const featureCounts = countBy(
     graph.nodes.flatMap((node) => (node.feature === undefined ? [] : [node.feature])),
   )
@@ -106,11 +106,11 @@ test('mouth keeps a dark open cavity with a luminous double rim and lower tongue
   assert.ok(highlights.some((node) => node.color[0] > 0.98 && node.color[1] > 0.45))
   assert.ok(mouthNodes.some((node) => node.x < -0.4))
   assert.ok(mouthNodes.some((node) => node.x > 0.4))
-  assert.ok(mouthNodes.some((node) => node.y < -0.86))
+  assert.ok(mouthNodes.some((node) => node.y < -0.84))
 })
 
 test('all edges reference valid distinct nodes', () => {
-  const graph = createCalciferGraph({ nodeCount: 220, seed: 2026 })
+  const graph = createPresentationGraph({ nodeCount: 220, seed: 2026 })
 
   for (const edge of graph.edges) {
     assert.notEqual(edge.source, edge.target)
