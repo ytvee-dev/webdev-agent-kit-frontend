@@ -1,56 +1,80 @@
-# Calcifer graph hero
+# Reference-matched fire demon hero
 
 ## Rendering
 
 The section is statically rendered by Astro. The heading, description, actions and technology labels are present in the first HTML response. The animated canvas is decorative and does not contain SEO-critical content.
 
-The graph is borderless and covers the full hero section. The initial desktop camera places the demon on the right, while the canvas and pointer coordinate system continue across the whole section so a dragged node can stretch the graph far beyond its resting silhouette.
+The graph is borderless and covers the full hero section. The initial desktop camera places the demon on the right, while the canvas and pointer coordinate system continue across the whole section so a dragged node can stretch the graph through the complete hero field.
 
 The graph uses two Three.js draw calls:
 
-- `THREE.Points` with a custom shader for every body, face and spark node;
-- `THREE.LineSegments` for every connection.
+- `THREE.Points` with a custom shader for all body, contour, face and detached fire nodes;
+- `THREE.LineSegments` for all graph connections.
 
-No post-processing pass is used. Soft glow is calculated inside the point fragment shader, which avoids an additional framebuffer and reduces GPU cost on laptops and mobile devices.
+No post-processing pass is used. The point fragment shader renders a hard luminous core, a softer inner core and a role-controlled halo. This keeps the glow expressive without adding an extra framebuffer or bloom pipeline.
 
-## Shape generation
+## Reference-derived silhouette
 
-The silhouette is generated deterministically from a seeded pseudo-random function. The body combines a broad rounded base, shoulders and five tapered flame tongues. The tall central tongue and raised side arms define the reference pose.
+The main body no longer depends only on primitive ellipses. A compact 72 × 72 density field was derived from the supplied warm reference and stored as numeric rows in `referenceMask.ts`. The runtime samples that field with bilinear interpolation.
 
-The face is generated as explicit graph structures:
+The density field controls:
 
-- two large luminous eyes with outer rings, inner rings and dense fill nodes;
-- dark pupil rings that preserve clear black centers;
-- a wide open mouth with separate upper and lower contours plus red interior particles.
+- the accepted body positions;
+- higher concentration around the face and lower core;
+- sparse crown tips and side flames;
+- the wide rounded lower body;
+- the raised side-arm silhouette;
+- contour detection through local density gradients.
 
-Body points are excluded from the eye and mouth voids so the expression remains readable at every quality level. Larger hub nodes are distributed through the body to reproduce the visual hierarchy of an Obsidian graph.
+The generator adds separate graph layers on top of the mask:
 
-Ambient fire uses two spark systems:
+- dense body particles;
+- a stronger contour/rim layer;
+- explicit raised arm chains with surrounding micro-particles;
+- two large eye structures with outer rings, inner rings, bright fill and compact black pupils;
+- a wide open mouth with upper and lower contours, a dark red interior and a brighter lower tongue arc;
+- large hub nodes distributed among much smaller particles;
+- detached starburst clusters and paired drifting embers.
 
-- radial starburst clusters with a larger hub and connected satellites;
-- paired embers distributed around the silhouette.
+Body points are excluded from eye and mouth voids so the expression remains readable. Every node is connected, but detached spark groups are allowed to remain separate visual components.
 
-Every generated node has at least one connection. The main body uses local nearest-neighbour edges, facial structures use stronger internal springs and selected face nodes attach back to the flame body.
+## Fire colour and scale
 
-## Physics
+Colour is calculated from height, distance from the hot core and local mask density. The palette moves through:
+
+1. cream and yellow in the dense lower core;
+2. amber and orange;
+3. red and crimson;
+4. magenta and violet at cooler outer tips;
+5. occasional blue on the highest or most distant particles.
+
+Node diameters vary by role and probability. The graph combines many micro-nodes with sparse large hubs, large black pupil nodes, bright eye particles and medium starburst centres.
+
+## Physics and idle combustion
 
 Every node stores its current position, velocity and immutable target position. Each frame applies:
 
 1. spring forces along graph edges;
-2. a target-anchor force that preserves the silhouette;
+2. a target-anchor force preserving the reference silhouette;
 3. velocity damping;
-4. role-aware idle convection;
-5. rendering-time flame and spark drift.
+4. role-aware lateral turbulence and upward convection;
+5. rendering-time thermal waves, flicker and size pulses.
 
-Flame and arm nodes move with layered slow and fast waves. Spark nodes use a wider, softer movement range. Eyes, pupils and mouth nodes stay comparatively stable so the expression does not dissolve.
+Flame, rim and arm nodes use layered slow, medium and fast waves. Starburst and ember nodes have wider orbital and upward drift. Eye, pupil and mouth nodes stay comparatively stable so the face does not dissolve.
 
-While a node is dragged, its target anchor is weakened for connected nodes up to five graph steps away. Influence decays by graph distance. The selected node follows the pointer directly, while its neighbours follow through the spring network. After release, target anchors restore the original silhouette.
+While a node is dragged, target anchors are weakened for connected nodes up to seven graph steps away. Influence decays by graph distance. This permits large full-section deformation while still allowing the demon to recover after release.
 
-## Torch reveal
+## Torch code reveal
 
-Six columns of small code cover the entire hero background in two DOM layers. The ambient layer remains barely visible across the section. The lit layer sits behind the WebGL graph and uses a radial CSS mask controlled by custom properties.
+Twelve narrow code columns cover the full hero in two DOM layers. Text is deliberately very small and dense.
 
-Dragging a node updates the mask position, radius and opacity. Pointer speed increases both brightness and illuminated area, producing a torch-like reveal without rendering code into WebGL. Releasing the node fades the lit code back into darkness.
+- The ambient layer remains almost invisible across the section.
+- The lit layer sits behind the WebGL canvas.
+- A radial CSS mask follows the dragged node and pointer.
+- Pointer speed increases mask radius, code opacity and the warm background haze.
+- Releasing the node fades the code and haze back into darkness.
+
+The code remains real DOM text rather than being painted into WebGL, preserving rendering simplicity and keeping it visually behind the graph.
 
 ## Loading and fallbacks
 
@@ -59,7 +83,7 @@ The first render displays an inline SVG graph generated from the same determinis
 The implementation also:
 
 - caps device pixel ratio;
-- reduces the source node count for coarse pointers and small viewports;
+- uses adaptive source density for mobile, tablet and desktop;
 - uses a responsive off-centre camera on desktop and a lower camera composition on narrow screens;
 - pauses animation when the document is hidden;
 - disposes GPU resources on disconnect;

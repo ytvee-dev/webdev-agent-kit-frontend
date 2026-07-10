@@ -5,7 +5,7 @@ const fallbackGraph = createCalciferGraph({ nodeCount: 180, seed: 20260710 })
 const toColor = (color: readonly [number, number, number]): string =>
   `rgb(${Math.round(color[0] * 255)} ${Math.round(color[1] * 255)} ${Math.round(color[2] * 255)})`
 
-const codeColumns = [
+const codeSources = [
   `type AgentTask = {
   scope: "frontend"
   evidence: Verification[]
@@ -16,7 +16,6 @@ const workflow = async (task: AgentTask) => {
   const context = await inspectProject(task.scope)
   const plan = createSmallestSafePlan(context)
   const result = await executeApprovedScope(plan)
-
   return verifyWithEvidence(result)
 }
 
@@ -24,12 +23,7 @@ export const guardrails = {
   broadRewrites: false,
   unapprovedPackages: false,
   fakeVerification: false,
-}
-
-const evidence = await verifyRoute({
-  viewport: 375,
-  command: "npm run check",
-})`,
+}`,
   `interface ProjectContext {
   framework: "astro" | "react" | "next"
   styling: "css-modules" | "scoped-css"
@@ -41,12 +35,7 @@ export const inspectProject = async () => {
   const files = await readRelevantFiles()
   const patterns = inferExistingPatterns(files)
   const risks = identifyChangeRisks(patterns)
-
-  return {
-    files,
-    patterns,
-    risks,
-  }
+  return { files, patterns, risks }
 }
 
 const scope = selectMinimumFiles({
@@ -115,7 +104,7 @@ return {
   verified: review.isSafe,
 }`,
   `const release = await prepareRelease({
-  branch: "feat/calcifer-firefield-refinement",
+  branch: "feat/reference-matched-fire-demon",
   target: "main",
   checks: [
     "types",
@@ -133,6 +122,8 @@ const pullRequest = await openPullRequest({
 
 export default pullRequest`,
 ]
+
+const codeColumns = Array.from({ length: 12 }, (_, index) => codeSources[index % codeSources.length])
 ---
 
 <calcifer-graph class="graph" data-ready="false" data-dragging="false" data-failed="false">
@@ -146,13 +137,13 @@ export default pullRequest`,
 
   <svg
     class="fallback"
-    viewBox="-1.65 -1.55 3.3 3.1"
+    viewBox="-1.82 -1.64 3.64 3.34"
     preserveAspectRatio="xMidYMid meet"
     role="img"
     aria-label="A smiling fire demon formed from connected graph nodes"
   >
     <g transform="scale(1 -1)">
-      {fallbackGraph.edges.slice(0, 1400).map((edge) => {
+      {fallbackGraph.edges.slice(0, 2200).map((edge) => {
         const source = fallbackGraph.nodes[edge.source]
         const target = fallbackGraph.nodes[edge.target]
 
@@ -167,8 +158,8 @@ export default pullRequest`,
             x2={target.x}
             y2={target.y}
             stroke={toColor(source.color)}
-            stroke-opacity={source.role === 'pupil' ? '0.04' : '0.28'}
-            stroke-width="0.0048"
+            stroke-opacity={source.role === 'pupil' ? '0.035' : '0.28'}
+            stroke-width="0.0042"
           />
         )
       })}
@@ -176,9 +167,9 @@ export default pullRequest`,
         <circle
           cx={node.x}
           cy={node.y}
-          r={node.size / 720}
+          r={node.size / 760}
           fill={toColor(node.color)}
-          fill-opacity={node.role === 'pupil' ? '1' : '0.96'}
+          fill-opacity={node.role === 'pupil' ? '1' : '0.97'}
         />
       ))}
     </g>
@@ -186,8 +177,8 @@ export default pullRequest`,
 
   <canvas class="canvas" aria-hidden="true"></canvas>
   <span class="sr-only">
-    The graph is decorative. Drag a visible node to stretch the connected fire demon and reveal the
-    code hidden in the darkness behind it.
+    The graph is decorative. Drag a visible node to stretch the connected fire demon across the section
+    and reveal the code hidden in the darkness behind it.
   </span>
 </calcifer-graph>
 
@@ -216,9 +207,9 @@ export default pullRequest`,
       }
 
       if (typeof idleWindow.requestIdleCallback === 'function') {
-        this.idleId = idleWindow.requestIdleCallback(() => void this.load(), { timeout: 1400 })
+        this.idleId = idleWindow.requestIdleCallback(() => void this.load(), { timeout: 1250 })
       } else {
-        this.timeoutId = globalThis.setTimeout(() => void this.load(), 760)
+        this.timeoutId = globalThis.setTimeout(() => void this.load(), 680)
       }
     }
 
@@ -272,8 +263,9 @@ export default pullRequest`,
   .graph {
     --torch-x: 66%;
     --torch-y: 50%;
-    --torch-radius: 220px;
+    --torch-radius: 190px;
     --torch-intensity: 0;
+    --torch-warmth: 0;
     position: relative;
     display: block;
     width: 100%;
@@ -296,17 +288,25 @@ export default pullRequest`,
 
   .graph::before {
     background:
-      radial-gradient(circle at 67% 54%, rgba(255, 80, 15, 0.16), transparent 24%),
-      radial-gradient(circle at 69% 45%, rgba(255, 185, 65, 0.075), transparent 35%),
-      radial-gradient(circle at 82% 22%, rgba(129, 24, 7, 0.11), transparent 23%);
-    filter: blur(38px);
+      radial-gradient(circle at 68% 54%, rgba(255, 78, 12, 0.18), transparent 22%),
+      radial-gradient(circle at 70% 44%, rgba(255, 188, 60, 0.075), transparent 34%),
+      radial-gradient(circle at 82% 18%, rgba(114, 16, 80, 0.09), transparent 24%);
+    filter: blur(42px);
     opacity: 0.92;
   }
 
   .graph::after {
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.42'/%3E%3C/svg%3E");
-    mix-blend-mode: soft-light;
-    opacity: 0.1;
+    background:
+      radial-gradient(
+        circle var(--torch-radius) at var(--torch-x) var(--torch-y),
+        rgba(255, 190, 85, calc(var(--torch-intensity) * 0.15)),
+        rgba(255, 72, 15, calc(var(--torch-intensity) * 0.075)) 42%,
+        transparent 78%
+      ),
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.42'/%3E%3C/svg%3E");
+    mix-blend-mode: screen, soft-light;
+    opacity: calc(0.08 + var(--torch-warmth) * 0.28);
+    transition: opacity 420ms ease;
   }
 
   .canvas,
@@ -328,12 +328,12 @@ export default pullRequest`,
   .fallback {
     z-index: 3;
     box-sizing: border-box;
-    padding: clamp(52px, 6vw, 104px);
+    padding: clamp(28px, 4.5vw, 78px);
     filter:
-      drop-shadow(0 0 12px rgba(255, 70, 10, 0.34))
-      drop-shadow(0 0 42px rgba(255, 96, 18, 0.18));
+      drop-shadow(0 0 12px rgba(255, 66, 8, 0.38))
+      drop-shadow(0 0 48px rgba(255, 88, 16, 0.2));
     opacity: 1;
-    transform: translateX(clamp(110px, 17vw, 310px)) scale(0.92);
+    transform: translateX(clamp(96px, 17vw, 310px)) scale(0.96);
     transition: opacity 460ms ease;
   }
 
@@ -341,14 +341,14 @@ export default pullRequest`,
     z-index: 1;
     display: grid;
     box-sizing: border-box;
-    grid-template-columns: repeat(6, minmax(150px, 1fr));
-    gap: clamp(28px, 4.2vw, 78px);
-    padding: 3vh 2.5vw;
+    grid-template-columns: repeat(12, minmax(92px, 1fr));
+    gap: clamp(14px, 1.9vw, 34px);
+    padding: 1.4vh 1.1vw;
     overflow: hidden;
-    color: rgba(255, 214, 151, 0.64);
+    color: rgba(255, 220, 168, 0.72);
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
     pointer-events: none;
-    transform: rotate(-1.35deg) scale(1.07);
+    transform: rotate(-0.65deg) scale(1.035);
     transform-origin: center;
   }
 
@@ -356,32 +356,33 @@ export default pullRequest`,
     min-width: 0;
     margin: 0;
     font: inherit;
-    font-size: clamp(7px, 0.52vw, 9px);
-    line-height: 1.82;
-    letter-spacing: -0.025em;
+    font-size: clamp(5px, 0.37vw, 7px);
+    line-height: 1.68;
+    letter-spacing: -0.035em;
     white-space: pre-wrap;
     word-break: break-word;
   }
 
   .code-field--ambient {
-    opacity: 0.032;
-    filter: blur(0.25px);
+    opacity: 0.019;
+    filter: blur(0.22px);
   }
 
   .code-field--lit {
     z-index: 2;
     opacity: var(--torch-intensity);
     filter:
-      drop-shadow(0 0 8px rgba(255, 129, 37, 0.28))
-      blur(0.08px);
+      drop-shadow(0 0 7px rgba(255, 142, 48, 0.38))
+      drop-shadow(0 0 20px rgba(255, 72, 14, 0.16));
     mask-image: radial-gradient(
       circle var(--torch-radius) at var(--torch-x) var(--torch-y),
       #000 0,
-      rgba(0, 0, 0, 0.98) 26%,
-      rgba(0, 0, 0, 0.58) 61%,
+      rgba(0, 0, 0, 0.98) 24%,
+      rgba(0, 0, 0, 0.62) 58%,
+      rgba(0, 0, 0, 0.18) 78%,
       transparent 100%
     );
-    transition: opacity 520ms ease;
+    transition: opacity 460ms ease;
   }
 
   .graph[data-ready='true'] .canvas {
@@ -399,42 +400,44 @@ export default pullRequest`,
 
   @media (max-width: 1040px) {
     .fallback {
-      padding: clamp(42px, 7vw, 82px);
-      transform: translateY(6%) scale(0.92);
+      padding: 170px 32px 26px;
+      transform: translateY(180px) scale(0.92);
     }
 
     .code-field {
-      grid-template-columns: repeat(4, minmax(150px, 1fr));
-      gap: 34px;
+      grid-template-columns: repeat(8, minmax(90px, 1fr));
+      gap: 18px;
+      padding: 1.5vh 1.4vw;
     }
   }
 
   @media (max-width: 620px) {
     .graph {
-      min-height: 620px;
+      min-height: 1120px;
     }
 
     .fallback {
-      padding: 48px 8px 12px;
-      transform: translateY(14%) scale(0.96);
+      padding: 570px 12px 32px;
+      transform: translateY(116px) scale(1.03);
     }
 
     .code-field {
-      grid-template-columns: repeat(3, minmax(128px, 1fr));
-      gap: 22px;
-      padding: 16px;
+      grid-template-columns: repeat(6, minmax(74px, 1fr));
+      gap: 12px;
+      padding: 8px;
     }
 
     .code-field pre {
-      font-size: 6.5px;
-      line-height: 1.75;
+      font-size: 5px;
+      line-height: 1.58;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .canvas,
     .fallback,
-    .code-field--lit {
+    .code-field,
+    .graph::after {
       transition: none;
     }
   }

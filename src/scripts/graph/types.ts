@@ -1,4 +1,12 @@
-export type GraphNodeRole = 'flame' | 'arm' | 'eye' | 'pupil' | 'mouth' | 'spark'
+export type GraphNodeRole =
+  | 'flame'
+  | 'rim'
+  | 'arm'
+  | 'eye'
+  | 'pupil'
+  | 'mouth'
+  | 'spark'
+  | 'ember'
 
 export type Rgb = readonly [number, number, number]
 

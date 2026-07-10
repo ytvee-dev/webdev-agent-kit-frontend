@@ -59,19 +59,43 @@ const applyEdgeSpring = (
 }
 
 const getRoleMotion = (role: PhysicsState['nodes'][number]['role']): number => {
+  if (role === 'ember') {
+    return 3.1
+  }
+
   if (role === 'spark') {
-    return 2.15
+    return 2.45
   }
 
   if (role === 'arm') {
-    return 1.35
+    return 1.48
+  }
+
+  if (role === 'rim') {
+    return 1.18
   }
 
   if (role === 'flame') {
     return 1
   }
 
-  return 0.12
+  return 0.075
+}
+
+const getDamping = (role: PhysicsState['nodes'][number]['role']): number => {
+  if (role === 'ember') {
+    return 3.8
+  }
+
+  if (role === 'spark') {
+    return 4.2
+  }
+
+  if (role === 'arm' || role === 'rim') {
+    return 5
+  }
+
+  return 5.65
 }
 
 export const stepGraphPhysics = (
@@ -109,22 +133,37 @@ export const stepGraphPhysics = (
     }
 
     const roleMotion = getRoleMotion(node.role)
-    const slowWave = Math.sin(elapsedSeconds * 1.05 + node.phase)
-    const fastWave = Math.sin(elapsedSeconds * 3.6 + node.phase * 1.73)
-    const verticalWave = Math.cos(elapsedSeconds * 1.34 + node.phase * 1.21)
-    const driftX =
-      (slowWave * 0.014 + fastWave * 0.0055) * roleMotion * motionScale
-    const driftY =
-      (verticalWave * 0.017 + fastWave * 0.0045) * roleMotion * motionScale +
-      (node.role === 'spark' ? Math.sin(elapsedSeconds * 0.72 + node.phase) * 0.024 : 0)
+    const height = clamp((node.targetY + 1.08) / 2.58, 0, 1)
+    const slowWave = Math.sin(elapsedSeconds * 0.92 + node.phase)
+    const mediumWave = Math.sin(elapsedSeconds * 2.35 + node.phase * 1.47)
+    const fastWave = Math.sin(elapsedSeconds * 5.6 + node.phase * 2.11)
+    const thermalWave = Math.sin(elapsedSeconds * 1.28 - node.targetY * 4.6 + node.phase * 0.52)
+    const lateral =
+      (slowWave * 0.013 + mediumWave * 0.007 + fastWave * 0.0035) *
+      roleMotion *
+      (0.56 + height * 0.72) *
+      motionScale
+    const convection =
+      (Math.max(0, thermalWave) * 0.018 + mediumWave * 0.005) *
+      roleMotion *
+      (0.48 + height * 0.84) *
+      motionScale
+    const orbitalX =
+      node.role === 'spark' || node.role === 'ember'
+        ? Math.cos(elapsedSeconds * 0.68 + node.phase) * 0.023 * roleMotion
+        : 0
+    const orbitalY =
+      node.role === 'spark' || node.role === 'ember'
+        ? Math.sin(elapsedSeconds * 0.56 + node.phase * 1.2) * 0.029 * roleMotion
+        : 0
     const influence = options.dragInfluence?.[index] ?? 0
-    const anchorScale = 1 - influence * 0.78
+    const anchorScale = 1 - influence * 0.9
     const anchor = node.anchorStrength * anchorScale
-    const targetX = node.targetX + driftX
-    const targetY = node.targetY + driftY
+    const targetX = node.targetX + lateral + orbitalX
+    const targetY = node.targetY + convection + orbitalY
     const targetZ =
       node.targetZ +
-      Math.sin(elapsedSeconds * 0.92 + node.phase) * 0.009 * roleMotion * motionScale
+      Math.sin(elapsedSeconds * 0.86 + node.phase) * 0.012 * roleMotion * motionScale
 
     accelerationX[index] = (accelerationX[index] ?? 0) + (targetX - node.x) * anchor
     accelerationY[index] = (accelerationY[index] ?? 0) + (targetY - node.y) * anchor
@@ -134,7 +173,7 @@ export const stepGraphPhysics = (
     node.vy += (accelerationY[index] ?? 0) * delta
     node.vz += (accelerationZ[index] ?? 0) * delta
 
-    const damping = Math.exp(-(node.role === 'spark' ? 4.65 : 5.55) * delta)
+    const damping = Math.exp(-getDamping(node.role) * delta)
     node.vx *= damping
     node.vy *= damping
     node.vz *= damping
@@ -164,11 +203,11 @@ export const createDragInfluence = (
   while (queue.length > 0) {
     const current = queue.shift()
 
-    if (!current || current.depth > 5) {
+    if (!current || current.depth > 7) {
       continue
     }
 
-    influence[current.index] = Math.max(influence[current.index] ?? 0, Math.pow(0.62, current.depth))
+    influence[current.index] = Math.max(influence[current.index] ?? 0, Math.pow(0.67, current.depth))
 
     for (const neighbour of adjacency[current.index] ?? []) {
       if (visited.has(neighbour)) {
