@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { createCalciferGraph } from './generateGraph'
 import { createDragInfluence, createPhysicsState, stepGraphPhysics } from './physics'
-import type { CalciferGraphData, Rgb } from './types'
+import type { CalciferGraphData, GraphNodeRole, Rgb } from './types'
 
 interface PointerSample {
   x: number
@@ -38,12 +38,13 @@ const fragmentShader = `
     float distanceToCenter = distance(gl_PointCoord, vec2(0.5));
     if (distanceToCenter > 0.5) discard;
 
-    float core = 1.0 - smoothstep(0.05, 0.28, distanceToCenter);
-    float halo = 1.0 - smoothstep(0.16, 0.5, distanceToCenter);
+    float hardCore = 1.0 - smoothstep(0.045, 0.24, distanceToCenter);
+    float softCore = 1.0 - smoothstep(0.12, 0.37, distanceToCenter);
+    float halo = 1.0 - smoothstep(0.22, 0.5, distanceToCenter);
     float haloStrength = halo * vGlow;
-    float alpha = clamp(core + haloStrength * (0.42 + vHeat * 0.26), 0.0, 1.0);
-    vec3 fireCore = vec3(1.0, 0.9, 0.62);
-    vec3 glow = mix(vColor, fireCore, (haloStrength * 0.22 + vHeat * 0.16) * vGlow);
+    float alpha = clamp(hardCore + softCore * 0.52 + haloStrength * (0.3 + vHeat * 0.36), 0.0, 1.0);
+    vec3 fireCore = vec3(1.0, 0.93, 0.68);
+    vec3 glow = mix(vColor, fireCore, (softCore * 0.12 + haloStrength * 0.24 + vHeat * 0.16) * vGlow);
     gl_FragColor = vec4(glow, alpha);
   }
 `
@@ -56,20 +57,40 @@ const getQualityNodeCount = (): number => {
   const width = window.innerWidth
 
   if (coarsePointer || width < 640) {
-    return 230
+    return 340
   }
 
   if (width < 1100) {
-    return 330
+    return 520
   }
 
-  return 470
+  return 760
 }
 
 const writeColor = (target: Float32Array, offset: number, color: Rgb, multiplier = 1): void => {
   target[offset] = color[0] * multiplier
   target[offset + 1] = color[1] * multiplier
   target[offset + 2] = color[2] * multiplier
+}
+
+const getRoleGlow = (role: GraphNodeRole): number => {
+  if (role === 'pupil') {
+    return 0
+  }
+
+  if (role === 'eye') {
+    return 1.18
+  }
+
+  if (role === 'spark' || role === 'ember') {
+    return 1.12
+  }
+
+  if (role === 'mouth') {
+    return 0.76
+  }
+
+  return 1
 }
 
 const createPointGeometry = (graph: CalciferGraphData): THREE.BufferGeometry => {
@@ -87,7 +108,7 @@ const createPointGeometry = (graph: CalciferGraphData): THREE.BufferGeometry => 
     writeColor(colors, offset, node.color)
     sizes[node.id] = node.size
     heat[node.id] = 0
-    glow[node.id] = node.role === 'pupil' ? 0 : 1
+    glow[node.id] = getRoleGlow(node.role)
   }
 
   const geometry = new THREE.BufferGeometry()
@@ -125,8 +146,8 @@ const createLineGeometry = (graph: CalciferGraphData): THREE.BufferGeometry => {
     positions[offset + 3] = target.x
     positions[offset + 4] = target.y
     positions[offset + 5] = target.z
-    writeColor(colors, offset, source.color, 0.56)
-    writeColor(colors, offset + 3, target.color, 0.56)
+    writeColor(colors, offset, source.color, source.role === 'pupil' ? 0.08 : 0.48)
+    writeColor(colors, offset + 3, target.color, target.role === 'pupil' ? 0.08 : 0.48)
   }
 
   const geometry = new THREE.BufferGeometry()
@@ -181,6 +202,9 @@ const findNearestNode = (
   return nearest
 }
 
+const isCombustionRole = (role: GraphNodeRole): boolean =>
+  role === 'flame' || role === 'rim' || role === 'arm' || role === 'spark' || role === 'ember'
+
 export const mountCalciferGraph = (
   host: HTMLElement,
   canvas: HTMLCanvasElement,
@@ -198,7 +222,7 @@ export const mountCalciferGraph = (
   renderer.setClearColor(0x000000, 0)
 
   const scene = new THREE.Scene()
-  const camera = new THREE.OrthographicCamera(-1.8, 1.8, 1.45, -1.45, 0.1, 20)
+  const camera = new THREE.OrthographicCamera(-1.8, 1.8, 1.55, -1.55, 0.1, 20)
   camera.position.z = 5
 
   const pointGeometry = createPointGeometry(graph)
@@ -223,7 +247,7 @@ export const mountCalciferGraph = (
   const lineMaterial = new THREE.LineBasicMaterial({
     vertexColors: true,
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.36,
     depthWrite: false,
     depthTest: false,
     blending: THREE.AdditiveBlending,
@@ -255,12 +279,12 @@ export const mountCalciferGraph = (
   const resize = (): void => {
     const width = Math.max(1, host.clientWidth)
     const height = Math.max(1, host.clientHeight)
-    const pixelRatio = Math.min(window.devicePixelRatio, width < 700 ? 1.2 : 1.55)
+    const pixelRatio = Math.min(window.devicePixelRatio, width < 700 ? 1.15 : 1.5)
     const aspect = width / height
-    const vertical = aspect < 0.8 ? 1.72 : aspect < 1.15 ? 1.52 : 1.42
+    const vertical = aspect < 0.78 ? 1.82 : aspect < 1.08 ? 1.63 : 1.52
     const horizontal = vertical * aspect
-    const centerX = aspect > 1.35 ? -horizontal * 0.31 : aspect > 1.05 ? -horizontal * 0.12 : 0
-    const centerY = aspect < 0.8 ? 0.58 : aspect < 1.05 ? 0.18 : 0
+    const centerX = aspect > 1.45 ? -horizontal * 0.335 : aspect > 1.08 ? -horizontal * 0.14 : 0
+    const centerY = aspect < 0.78 ? 0.55 : aspect < 1.08 ? 0.18 : 0.05
 
     camera.top = centerY + vertical
     camera.bottom = centerY - vertical
@@ -279,7 +303,7 @@ export const mountCalciferGraph = (
     }
 
     if (viewportScaleUniform) {
-      viewportScaleUniform.value = clamp(Math.min(width, height) / 720, 0.72, 1.18)
+      viewportScaleUniform.value = clamp(Math.min(width, height) / 760, 0.66, 1.14)
     }
   }
 
@@ -287,12 +311,14 @@ export const mountCalciferGraph = (
     const rect = torchSurface.getBoundingClientRect()
     const x = clamp(event.clientX - rect.left, 0, rect.width)
     const y = clamp(event.clientY - rect.top, 0, rect.height)
-    const radius = clamp(190 + speed * 240, 190, 350)
+    const radius = clamp(155 + speed * 285, 155, 390)
+    const warmth = clamp(0.48 + speed * 0.62, 0.48, 1)
 
     torchSurface.style.setProperty('--torch-x', `${x}px`)
     torchSurface.style.setProperty('--torch-y', `${y}px`)
     torchSurface.style.setProperty('--torch-radius', `${radius}px`)
     torchSurface.style.setProperty('--torch-intensity', intensity.toFixed(3))
+    torchSurface.style.setProperty('--torch-warmth', warmth.toFixed(3))
   }
 
   const updateGeometry = (elapsed: number): void => {
@@ -310,39 +336,44 @@ export const mountCalciferGraph = (
 
       const offset = index * 3
       const influence = dragInfluence?.[index] ?? 0
-      const slowFlicker = Math.sin(elapsed * 2.35 + seed.phase)
-      const quickFlicker = Math.sin(elapsed * 6.8 + seed.phase * 1.83)
-      const upwardBias = clamp((seed.y + 0.85) / 2.15, 0, 1)
-      const isFire = seed.role === 'flame' || seed.role === 'arm'
-      const isSpark = seed.role === 'spark'
-      const renderDriftX = isSpark
-        ? Math.sin(elapsed * 1.5 + seed.phase) * 0.025
-        : isFire
-          ? quickFlicker * 0.0055 * (0.5 + upwardBias)
+      const slowFlicker = Math.sin(elapsed * 1.75 + seed.phase)
+      const mediumFlicker = Math.sin(elapsed * 4.25 + seed.phase * 1.61)
+      const quickFlicker = Math.sin(elapsed * 8.4 + seed.phase * 2.17)
+      const thermalWave = Math.sin(elapsed * 2.05 - seed.y * 5.8 + seed.phase * 0.44)
+      const upwardBias = clamp((seed.y + 1.08) / 2.58, 0, 1)
+      const combustion = isCombustionRole(seed.role)
+      const detached = seed.role === 'spark' || seed.role === 'ember'
+      const renderDriftX = detached
+        ? (slowFlicker * 0.025 + mediumFlicker * 0.009) * (seed.role === 'ember' ? 1.35 : 1)
+        : combustion
+          ? (mediumFlicker * 0.006 + quickFlicker * 0.0028) * (0.55 + upwardBias)
           : 0
-      const renderDriftY = isSpark
-        ? Math.sin(elapsed * 1.08 + seed.phase * 1.27) * 0.035
-        : isFire
-          ? Math.max(0, slowFlicker) * 0.009 * (0.45 + upwardBias)
+      const renderDriftY = detached
+        ? (Math.max(0, thermalWave) * 0.034 + slowFlicker * 0.014) *
+          (seed.role === 'ember' ? 1.4 : 1)
+        : combustion
+          ? (Math.max(0, thermalWave) * 0.012 + mediumFlicker * 0.0038) *
+            (0.5 + upwardBias)
           : 0
       const renderX = node.x + renderDriftX
       const renderY = node.y + renderDriftY
       const renderZ = node.z
-      const idleHeat = isSpark
-        ? 0.34 + (slowFlicker + 1) * 0.19
-        : isFire
-          ? 0.12 + Math.max(0, slowFlicker * 0.24 + quickFlicker * 0.12)
+      const idleHeat = detached
+        ? 0.28 + (slowFlicker + 1) * 0.16 + Math.max(0, quickFlicker) * 0.18
+        : combustion
+          ? 0.12 + Math.max(0, thermalWave) * 0.24 + Math.max(0, quickFlicker) * 0.12
           : seed.role === 'eye'
-            ? 0.22 + Math.max(0, slowFlicker) * 0.08
+            ? 0.3 + Math.max(0, slowFlicker) * 0.1
             : seed.role === 'mouth'
-              ? 0.14 + Math.max(0, quickFlicker) * 0.12
+              ? 0.16 + Math.max(0, mediumFlicker) * 0.12
               : 0
-      const activeHeat = seed.role === 'pupil' ? 0 : clamp(idleHeat + influence * 0.92, 0, 1)
-      const brightness = seed.role === 'pupil' ? 1 : 1 + activeHeat * 0.24
+      const activeHeat = seed.role === 'pupil' ? 0 : clamp(idleHeat + influence * 0.96, 0, 1)
+      const brightness = seed.role === 'pupil' ? 1 : 1 + activeHeat * 0.28
+      const pulseStrength = detached ? 0.17 : seed.role === 'rim' ? 0.085 : combustion ? 0.06 : 0.018
       const scalePulse =
         seed.role === 'pupil'
           ? 1
-          : 1 + slowFlicker * (isSpark ? 0.12 : isFire ? 0.055 : 0.018) + influence * 0.2
+          : 1 + slowFlicker * pulseStrength + quickFlicker * pulseStrength * 0.35 + influence * 0.22
 
       renderPositions[offset] = renderX
       renderPositions[offset + 1] = renderY
@@ -350,7 +381,7 @@ export const mountCalciferGraph = (
       positionAttribute.setXYZ(index, renderX, renderY, renderZ)
       writeColor(colorArray, offset, seed.color, brightness)
       heatArray[index] = activeHeat
-      sizeArray[index] = seed.size * scalePulse
+      sizeArray[index] = seed.size * Math.max(0.7, scalePulse)
     }
 
     for (let index = 0; index < graph.edges.length; index += 1) {
@@ -371,9 +402,11 @@ export const mountCalciferGraph = (
       const targetOffset = edge.target * 3
       const lineOffset = index * 6
       const edgeHeat = Math.max(dragInfluence?.[edge.source] ?? 0, dragInfluence?.[edge.target] ?? 0)
-      const idlePulse =
-        Math.max(0, Math.sin(elapsed * 2.1 + sourceSeed.phase + targetSeed.phase)) * 0.16
-      const multiplier = 0.5 + idlePulse + edgeHeat * 0.72
+      const wave = Math.sin(elapsed * 2.45 - (sourceSeed.y + targetSeed.y) * 3.2 + sourceSeed.phase)
+      const quick = Math.sin(elapsed * 6.2 + sourceSeed.phase + targetSeed.phase)
+      const idlePulse = Math.max(0, wave) * 0.17 + Math.max(0, quick) * 0.08
+      const pupilEdge = sourceSeed.role === 'pupil' || targetSeed.role === 'pupil'
+      const multiplier = pupilEdge ? 0.07 : 0.42 + idlePulse + edgeHeat * 0.78
 
       linePositionAttribute.setXYZ(
         index * 2,
@@ -430,7 +463,7 @@ export const mountCalciferGraph = (
 
   const onPointerDown = (event: PointerEvent): void => {
     const point = getPointerWorld(event, canvas, camera)
-    const threshold = event.pointerType === 'touch' ? 0.25 : 0.17
+    const threshold = event.pointerType === 'touch' ? 0.27 : 0.18
     const nearest = findNearestNode(graph, state, point, threshold)
 
     if (nearest < 0) {
@@ -445,13 +478,13 @@ export const mountCalciferGraph = (
     canvas.setPointerCapture(event.pointerId)
     canvas.style.cursor = 'grabbing'
     host.dataset.dragging = 'true'
-    setTorch(event, 0.74)
+    setTorch(event, 0.82)
   }
 
   const onPointerMove = (event: PointerEvent): void => {
     if (draggedIndex < 0) {
       const point = getPointerWorld(event, canvas, camera)
-      canvas.style.cursor = findNearestNode(graph, state, point, 0.17) >= 0 ? 'grab' : 'default'
+      canvas.style.cursor = findNearestNode(graph, state, point, 0.18) >= 0 ? 'grab' : 'default'
       return
     }
 
@@ -465,7 +498,7 @@ export const mountCalciferGraph = (
       event.clientY - (previous?.y ?? event.clientY),
     )
     const speed = distance / elapsed
-    const intensity = clamp(0.62 + speed * 0.72, 0.62, 1)
+    const intensity = clamp(0.68 + speed * 0.78, 0.68, 1)
 
     pointerSample = { x: event.clientX, y: event.clientY, time: now }
     setTorch(event, intensity, speed)
@@ -486,6 +519,7 @@ export const mountCalciferGraph = (
     canvas.style.cursor = 'default'
     host.dataset.dragging = 'false'
     torchSurface.style.setProperty('--torch-intensity', '0')
+    torchSurface.style.setProperty('--torch-warmth', '0')
   }
 
   const onVisibilityChange = (): void => {
