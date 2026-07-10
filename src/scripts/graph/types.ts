@@ -8,11 +8,24 @@ export type GraphNodeRole =
   | 'spark'
   | 'ember'
 
+export type GraphNodeFeature =
+  | 'eye-outer-rim'
+  | 'eye-sclera'
+  | 'eye-iris'
+  | 'eye-highlight'
+  | 'eye-pupil'
+  | 'mouth-outer-rim'
+  | 'mouth-inner-rim'
+  | 'mouth-cavity'
+  | 'mouth-tongue'
+  | 'mouth-highlight'
+
 export type Rgb = readonly [number, number, number]
 
 export interface GraphNodeSeed {
   id: number
   role: GraphNodeRole
+  feature?: GraphNodeFeature
   x: number
   y: number
   z: number

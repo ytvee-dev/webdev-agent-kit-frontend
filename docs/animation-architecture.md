@@ -1,91 +1,143 @@
-# Reference-matched fire demon hero
+# Fire-demon face, combustion and torch interaction
 
-## Rendering
+## Rendering model
 
-The section is statically rendered by Astro. The heading, description, actions and technology labels are present in the first HTML response. The animated canvas is decorative and does not contain SEO-critical content.
+The hero remains statically rendered by Astro. The heading, description, actions and technology labels are present in the first HTML response. The WebGL graph is decorative and contains no SEO-critical content.
 
-The graph is borderless and covers the full hero section. The initial desktop camera places the demon on the right, while the canvas and pointer coordinate system continue across the whole section so a dragged node can stretch the graph through the complete hero field.
+The graph is borderless and occupies the complete hero section. Its resting composition is offset to the right on desktop, while the canvas and pointer coordinate system cover the entire section so any node can be dragged far beyond the initial silhouette.
 
-The graph uses two Three.js draw calls:
+Three.js still renders the complete character with two draw calls:
 
-- `THREE.Points` with a custom shader for all body, contour, face and detached fire nodes;
+- `THREE.Points` for body, contour, face, sparks and embers;
 - `THREE.LineSegments` for all graph connections.
 
-No post-processing pass is used. The point fragment shader renders a hard luminous core, a softer inner core and a role-controlled halo. This keeps the glow expressive without adding an extra framebuffer or bloom pipeline.
+No post-processing framebuffer is used. A custom point shader provides a hard particle core, a soft inner core and feature-controlled glow.
 
-## Reference-derived silhouette
+## Reference-derived body
 
-The main body no longer depends only on primitive ellipses. A compact 72 × 72 density field was derived from the supplied warm reference and stored as numeric rows in `referenceMask.ts`. The runtime samples that field with bilinear interpolation.
+The principal silhouette is sampled from the compact density field in `referenceMask.ts`. Density controls particle acceptance, concentration and colour. Local density gradients create a stronger contour layer around the rounded lower body, side flames, raised arms and crown tongues.
 
-The density field controls:
+The generator overlays explicit structures for:
 
-- the accepted body positions;
-- higher concentration around the face and lower core;
-- sparse crown tips and side flames;
-- the wide rounded lower body;
-- the raised side-arm silhouette;
-- contour detection through local density gradients.
+- body and contour particles;
+- raised arm chains and surrounding micro-particles;
+- sparse large Obsidian-style hubs;
+- detached starburst clusters;
+- paired embers drifting around the silhouette.
 
-The generator adds separate graph layers on top of the mask:
+## Face feature metadata
 
-- dense body particles;
-- a stronger contour/rim layer;
-- explicit raised arm chains with surrounding micro-particles;
-- two large eye structures with outer rings, inner rings, bright fill and compact black pupils;
-- a wide open mouth with upper and lower contours, a dark red interior and a brighter lower tongue arc;
-- large hub nodes distributed among much smaller particles;
-- detached starburst clusters and paired drifting embers.
+`GraphNodeSeed` may carry a `feature` value. The renderer uses this metadata to animate and illuminate facial layers differently without creating additional materials or draw calls.
 
-Body points are excluded from eye and mouth voids so the expression remains readable. Every node is connected, but detached spark groups are allowed to remain separate visual components.
+Eye features:
 
-## Fire colour and scale
+- `eye-outer-rim`;
+- `eye-sclera`;
+- `eye-iris`;
+- `eye-highlight`;
+- `eye-pupil`.
 
-Colour is calculated from height, distance from the hot core and local mask density. The palette moves through:
+Mouth features:
 
-1. cream and yellow in the dense lower core;
-2. amber and orange;
-3. red and crimson;
-4. magenta and violet at cooler outer tips;
-5. occasional blue on the highest or most distant particles.
+- `mouth-outer-rim`;
+- `mouth-inner-rim`;
+- `mouth-cavity`;
+- `mouth-tongue`;
+- `mouth-highlight`.
 
-Node diameters vary by role and probability. The graph combines many micro-nodes with sparse large hubs, large black pupil nodes, bright eye particles and medium starburst centres.
+## Eye construction
 
-## Physics and idle combustion
+The eyes are deliberately asymmetric. The left eye is slightly larger and the two pupils have opposite horizontal offsets, matching the irregular character of the references.
 
-Every node stores its current position, velocity and immutable target position. Each frame applies:
+Each eye contains:
 
-1. spring forces along graph edges;
-2. a target-anchor force preserving the reference silhouette;
-3. velocity damping;
-4. role-aware lateral turbulence and upward convection;
-5. rendering-time thermal waves, flicker and size pulses.
+1. an irregular warm outer ring;
+2. a second bright structural ring;
+3. hundreds of cream and white micro-particles sampled within an annulus;
+4. a compact iris ring;
+5. a black pupil ring, central hub and dark fill particles;
+6. radial iris-to-pupil spokes;
+7. a small upper-left highlight cluster.
 
-Flame, rim and arm nodes use layered slow, medium and fast waves. Starburst and ember nodes have wider orbital and upward drift. Eye, pupil and mouth nodes stay comparatively stable so the face does not dissolve.
+The outer, middle, iris and pupil rings use stronger local springs. Selected outer-ring nodes attach the complete eye to the surrounding flame. This keeps the eyes readable while the rest of the graph stretches.
 
-While a node is dragged, target anchors are weakened for connected nodes up to seven graph steps away. Influence decays by graph distance. This permits large full-section deformation while still allowing the demon to recover after release.
+At render time, the two pupils share a slow, subtle gaze displacement. Sclera and iris particles twinkle independently, while highlight particles receive stronger glow and size pulses. Pupil particles remain black and do not receive bloom-like halos.
 
-## Torch code reveal
+## Mouth construction
 
-Twelve narrow code columns cover the full hero in two DOM layers. Text is deliberately very small and dense.
+The mouth is a broad raised-corner smile composed from four structural curves:
 
-- The ambient layer remains almost invisible across the section.
-- The lit layer sits behind the WebGL canvas.
-- A radial CSS mask follows the dragged node and pointer.
-- Pointer speed increases mask radius, code opacity and the warm background haze.
-- Releasing the node fades the code and haze back into darkness.
+- outer upper lip;
+- outer lower lip;
+- inner upper lip;
+- inner lower lip.
 
-The code remains real DOM text rather than being painted into WebGL, preserving rendering simplicity and keeping it visually behind the graph.
+The lower curves are deepened by `createPresentationGraph.ts`, after which all affected edge rest lengths are recalculated. This produces a deeper rounded opening without modifying the reusable body generator.
 
-## Loading and fallbacks
+Inside the contours:
 
-The first render displays an inline SVG graph generated from the same deterministic model. Three.js is code-split and loaded after browser idle time or the first pointer interaction.
+- only a small number of nearly black cavity particles are used so the opening remains visibly dark;
+- a dense red-orange tongue bed occupies the lower third;
+- a bright tongue arc defines the upper tongue edge;
+- additional lip highlights follow both contours;
+- larger corner nodes reinforce the raised smile.
+
+Mouth cavity particles have almost no glow. Tongue and highlight particles pulse separately from the lips, preserving the reference's dark opening and illuminated lower interior.
+
+## Idle combustion
+
+Physics preserves the reference pose through target anchors and graph springs. Rendering adds a second visual combustion layer that does not alter edge rest lengths.
+
+The animation combines:
+
+- slow, medium and fast particle flicker;
+- two upward travelling thermal bands;
+- height-dependent lateral turbulence;
+- rising and orbiting detached embers;
+- feature-aware size breathing;
+- dynamic per-node glow;
+- travelling brightness pulses along graph edges.
+
+Body, contour and arm particles move most like continuous fire. Sparks and embers have wider motion. Facial structures remain strongly anchored, but eye highlights, iris particles and the tongue receive controlled local animation so the face feels alive rather than rigid.
+
+## Drag interaction
+
+The selected node follows the pointer directly. Connected nodes react through the spring network, and drag influence propagates up to seven graph steps with exponential decay. Target anchors weaken under this influence, allowing the demon to stretch through the full hero field.
+
+After release, the original anchors recover the reference silhouette. Eye and mouth structures use stronger internal springs so they deform coherently instead of disintegrating into unrelated particles.
+
+## Code wall and torch reveal
+
+The background contains eighteen very narrow code columns. Each column combines two source fragments, producing a dense program-code wall across the full hero. Desktop text ranges from approximately 4.2 to 6 pixels.
+
+The wall is composed from:
+
+- a low-contrast texture and scan-line surface;
+- an almost invisible ambient code layer;
+- a duplicate illuminated code layer behind the WebGL canvas.
+
+During drag, pointer position updates CSS custom properties on the graph host:
+
+- `--torch-x` and `--torch-y`;
+- `--torch-radius`;
+- `--torch-intensity`;
+- `--torch-warmth`;
+- `--torch-core`.
+
+Pointer speed increases the light radius, code opacity, colour temperature and central halo. A multi-stop radial mask reveals the code gradually, resembling a torch illuminating writing on a dark wall rather than a flat circular spotlight. Both standard and WebKit mask declarations are included.
+
+The code remains real DOM text and stays below the WebGL canvas. When the node is released, all light variables return to zero and the wall fades into darkness.
+
+## Loading, accessibility and performance
+
+The first render uses an inline SVG produced from the same presentation graph. Three.js is code-split and loaded after browser idle time or initial pointer interaction.
 
 The implementation also:
 
+- adapts graph source density for mobile, tablet and desktop;
 - caps device pixel ratio;
-- uses adaptive source density for mobile, tablet and desktop;
-- uses a responsive off-centre camera on desktop and a lower camera composition on narrow screens;
-- pauses animation when the document is hidden;
-- disposes GPU resources on disconnect;
-- preserves the SVG fallback after WebGL context failure;
-- keeps the static SVG when `prefers-reduced-motion: reduce` is enabled.
+- pauses animation in hidden documents;
+- disposes geometries, materials and renderer resources on disconnect;
+- preserves the SVG fallback after WebGL context loss;
+- preserves a static fallback when `prefers-reduced-motion: reduce` is active;
+- keeps all meaningful content in static HTML.
