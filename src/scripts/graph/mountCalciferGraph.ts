@@ -260,17 +260,27 @@ export const mountCalciferGraph = (
     const vertical = aspect < 0.8 ? 1.72 : aspect < 1.15 ? 1.52 : 1.42
     const horizontal = vertical * aspect
     const centerX = aspect > 1.35 ? -horizontal * 0.31 : aspect > 1.05 ? -horizontal * 0.12 : 0
+    const centerY = aspect < 0.8 ? 0.58 : aspect < 1.05 ? 0.18 : 0
 
-    camera.top = vertical
-    camera.bottom = -vertical
+    camera.top = centerY + vertical
+    camera.bottom = centerY - vertical
     camera.left = centerX - horizontal
     camera.right = centerX + horizontal
     camera.updateProjectionMatrix()
 
     renderer.setPixelRatio(pixelRatio)
     renderer.setSize(width, height, false)
-    pointMaterial.uniforms.uPixelRatio.value = pixelRatio
-    pointMaterial.uniforms.uViewportScale.value = clamp(Math.min(width, height) / 720, 0.72, 1.18)
+
+    const pixelRatioUniform = pointMaterial.uniforms.uPixelRatio
+    const viewportScaleUniform = pointMaterial.uniforms.uViewportScale
+
+    if (pixelRatioUniform) {
+      pixelRatioUniform.value = pixelRatio
+    }
+
+    if (viewportScaleUniform) {
+      viewportScaleUniform.value = clamp(Math.min(width, height) / 720, 0.72, 1.18)
+    }
   }
 
   const setTorch = (event: PointerEvent, intensity: number, speed = 0): void => {
